@@ -289,11 +289,50 @@
     return lines.join("\n");
   }
 
-  function lastLoad(exercise, beforeDate) {
-    const hits = ALL.filter((s) => s.date < beforeDate).map((s) => Store.getLog(s.id)).filter((l) => l && l.loads && l.loads[exercise]);
-    if (!hits.length) return null;
-    const l = hits[hits.length - 1];
-    return { value: l.loads[exercise], date: byId[l.sessionId]?.date };
+  // ——— Series de fuerza: kg × reps por serie, sin cálculos a mano ———
+  // "4×6 RIR2" → {sets: 4, reps: 6} · "Test 5RM" → {1, 5} · "2 + 2" → {2, null} · "—" → null
+  function parseScheme(v) {
+    if (!v || v === "—") return null;
+    if (/test\s*5rm/i.test(v)) return { sets: 1, reps: 5 };
+    const m = v.match(/(\d+)\s*×\s*(\d+|máx)?/i);
+    if (m) return { sets: Math.min(8, +m[1]), reps: m[2] && !/máx/i.test(m[2]) ? +m[2] : null };
+    const m2 = v.match(/^(\d+)\s*\+/);
+    if (m2) return { sets: +m2[1], reps: null };
+    return { sets: 3, reps: null };
+  }
+  const isDumbbell = (ex) => /mancuerna|martillo|laterales/i.test(ex);
+  const isBodyweight = (ex) => /dominadas|fondos/i.test(ex);
+  const kgStr = (n) => (n == null ? "PC" : fmtNum(n, 2));
+  const e1rm = (kg, reps) => (kg && reps ? kg * (1 + Math.min(reps, 12) / 30) : 0);
+
+  function setsSummary(sets) {
+    if (!sets || !sets.length) return "";
+    const kgs = [...new Set(sets.map((x) => x.kg))];
+    if (kgs.length === 1) return `${kgStr(kgs[0])}${kgs[0] != null ? " kg" : ""} × ${sets.map((x) => x.reps ?? "?").join("-")}`;
+    return sets.map((x) => `${kgStr(x.kg)}×${x.reps ?? "?"}`).join(", ");
+  }
+  function setsStats(sets) {
+    let vol = 0, best = 0, reps = 0;
+    (sets || []).forEach((x) => { vol += (x.kg || 0) * (x.reps || 0); reps += x.reps || 0; best = Math.max(best, e1rm(x.kg, x.reps)); });
+    return { vol, best, reps, top: Math.max(0, ...(sets || []).map((x) => x.kg || 0)) };
+  }
+  function lastSets(exercise, beforeDate) {
+    for (let i = ALL.length - 1; i >= 0; i--) {
+      const s = ALL[i];
+      if (s.date >= beforeDate) continue;
+      const l = Store.getLog(s.id);
+      if (l?.sets?.[exercise]?.length) return { sets: l.sets[exercise], text: setsSummary(l.sets[exercise]), date: s.date };
+      if (l?.loads?.[exercise]) return { sets: null, text: l.loads[exercise], date: s.date };
+    }
+    return null;
+  }
+  // Sugerencia según las reglas del plan: si completaste todas las series y reps, +2,5 kg torso / +5 kg pierna
+  function suggestKg(k, scheme, prev) {
+    if (!prev?.sets?.length) return null;
+    const top = Math.max(...prev.sets.map((x) => x.kg || 0));
+    if (!top) return null;
+    const allDone = scheme && prev.sets.length >= scheme.sets && (!scheme.reps || prev.sets.every((x) => (x.reps || 0) >= scheme.reps));
+    return { kg: allDone ? top + (k === "A" ? 5 : 2.5) : top, up: allDone };
   }
 
   function strengthBlock(k, week, sessionId, editable) {
@@ -301,17 +340,126 @@
     const ci = t.weekCol[week];
     const s = byId[sessionId];
     const log = sessionId ? Store.getLog(sessionId) : null;
-    return `<div class="strength">
-      <div class="row-between"><h3><span class="fbadge">${k}</span>${esc(cap(t.name.split(" — ")[1] || t.name))}</h3><span class="pill">${t.cols[ci]}</span></div>
+    const head = `<div class="row-between"><h3><span class="fbadge">${k}</span>${esc(cap(t.name.split(" — ")[1] || t.name))}</h3><span class="pill">${t.cols[ci]}</span></div>
       ${week === 13 && k === "B" ? `<p class="muted tiny">Semana final: solo press banca, dominadas y remo, 2 × 5 a RIR 3.</p>` : ""}
-      ${(week === 6 || week === 10) && k === "C" ? `<p class="muted tiny">Reducida: solo torso, 2 series por ejercicio y sin farmers.</p>` : ""}
-      <div class="exlist">${t.rows.map((r) => {
-        const prev = editable ? lastLoad(r.ex, s.date) : null;
-        return `<div class="ex"><div class="ex-name">${esc(r.ex)}${prev ? `<small class="prev">Última: ${esc(prev.value)} · ${fmtDate(prev.date)}</small>` : ""}</div>
-          <div class="ex-sets">${esc(r.values[ci])}</div>
-          ${editable ? `<input class="load" data-ex="${esc(r.ex)}" value="${esc(log?.loads?.[r.ex] || "")}" placeholder="kg × reps" aria-label="Carga ${esc(r.ex)}">` : ""}</div>`;
-      }).join("")}</div>
+      ${(week === 6 || week === 10) && k === "C" ? `<p class="muted tiny">Reducida: solo torso, 2 series por ejercicio y sin farmers.</p>` : ""}`;
+    if (!editable) {
+      return `<div class="strength">${head}<div class="exlist">${t.rows.map((r) =>
+        `<div class="ex"><div class="ex-name">${esc(r.ex)}</div><div class="ex-sets">${esc(r.values[ci])}</div></div>`).join("")}</div></div>`;
+    }
+    return `<div class="strength" data-block="${k}">${head}
+      <p class="muted tiny how">Escribe los kg de la 1.ª serie y toca <b>✓</b> en las demás: se copian solas. Si dejas las reps vacías, cuentan las del plan.</p>
+      ${t.rows.map((r) => {
+        const scheme = parseScheme(r.values[ci]);
+        if (!scheme) return "";
+        const prev = lastSets(r.ex, s.date);
+        const sug = suggestKg(k, scheme, prev);
+        const saved = log?.sets?.[r.ex] || [];
+        const n = Math.max(scheme.sets, saved.length);
+        const baseKg = sug?.kg ?? null;
+        const unit = isDumbbell(r.ex) ? "kg/manc." : isBodyweight(r.ex) ? "lastre" : "kg";
+        return `<div class="exlog" data-ex="${esc(r.ex)}" data-reps="${scheme.reps ?? ""}" data-base="${baseKg ?? ""}">
+          <div class="exlog-head"><div class="ex-name">${esc(r.ex)}<small class="target">${esc(r.values[ci])}</small></div><span class="exlog-stat"></span></div>
+          ${prev ? `<div class="exlog-prev">Última · ${fmtDate(prev.date)}: <b>${esc(prev.text)}</b></div>` : ""}
+          ${!saved.length && log?.loads?.[r.ex] ? `<div class="exlog-prev">Anotado: <b>${esc(log.loads[r.ex])}</b></div>` : ""}
+          <div class="sets-head"><span></span><span>${unit}</span><span>reps</span><span></span></div><div class="sets">${Array.from({ length: n }, (_, i) => setRow(i, saved[i], scheme.reps)).join("")}</div>
+          <div class="exlog-actions">
+            <button type="button" class="chip-btn" data-act="add">+ Serie</button>
+            ${prev?.sets ? `<button type="button" class="chip-btn" data-act="repeat">Repetir última</button>` : ""}
+            ${sug ? `<button type="button" class="chip-btn ${sug.up ? "up" : ""}" data-act="suggest" data-kg="${sug.kg}">${sug.up ? "↑ " : ""}${kgStr(sug.kg)} kg en todas</button>` : ""}
+          </div>
+        </div>`;
+      }).join("")}
+      <div class="block-total"></div>
     </div>`;
+  }
+
+  function setRow(i, saved, reps) {
+    const done = saved ? "done" : "";
+    return `<div class="set ${done}">
+      <span class="set-n">${i + 1}</span>
+      <div class="stepper"><button type="button" data-step="-2.5" aria-label="Menos 2,5 kg">−</button><input class="kg" inputmode="decimal" value="${saved?.kg ?? ""}" aria-label="Kg serie ${i + 1}"><button type="button" data-step="2.5" aria-label="Más 2,5 kg">+</button></div>
+      <input class="reps" inputmode="numeric" value="${saved?.reps ?? ""}" placeholder="${reps ?? "reps"}" aria-label="Reps serie ${i + 1}">
+      <button type="button" class="tick" aria-label="Serie hecha">${ico("check")}</button>
+    </div>`;
+  }
+
+  // Lógica interactiva de las series (placeholders encadenados, ✓, +/−, totales)
+  function bindSets(root) {
+    const num0 = (v) => { const n = num(v); return n == null ? null : n; };
+    const refresh = (ex) => {
+      const base = num0(ex.dataset.base);
+      let carry = base;
+      const rows = [...ex.querySelectorAll(".set")];
+      rows.forEach((row) => {
+        const kg = row.querySelector(".kg");
+        kg.placeholder = carry != null ? fmtNum(carry, 2) : "kg";
+        const v = num0(kg.value);
+        if (v != null) carry = v;
+      });
+      const sets = readSets(ex);
+      const st = setsStats(sets);
+      ex.querySelector(".exlog-stat").innerHTML = sets.length ? `${sets.length} × · <b>${fmtNum(st.vol, 0)}</b> kg${st.best ? ` · 1RM ~${fmtNum(st.best, 0)}` : ""}` : "";
+      const block = ex.closest(".strength");
+      let tv = 0, ts = 0;
+      block.querySelectorAll(".exlog").forEach((e) => { const ss = readSets(e); ts += ss.length; tv += setsStats(ss).vol; });
+      block.querySelector(".block-total").innerHTML = ts ? `<span>Total sesión</span><b>${ts} series · ${fmtNum(tv, 0)} kg</b>` : "";
+    };
+    root.querySelectorAll(".exlog").forEach((ex) => {
+      refresh(ex);
+      ex.addEventListener("input", () => {
+        ex.querySelectorAll(".set").forEach((row) => row.classList.toggle("done", !!(row.querySelector(".kg").value || row.querySelector(".reps").value) || row.classList.contains("ticked")));
+        refresh(ex);
+      });
+      ex.addEventListener("click", (e) => {
+        const b = e.target.closest("button"); if (!b) return;
+        const row = b.closest(".set");
+        if (b.dataset.step && row) {
+          const kg = row.querySelector(".kg");
+          const cur = num0(kg.value) ?? num0(kg.placeholder) ?? 0;
+          kg.value = fmtNum(Math.max(0, cur + Number(b.dataset.step)), 2);
+          row.classList.add("done");
+        } else if (b.classList.contains("tick") && row) {
+          const kg = row.querySelector(".kg"), reps = row.querySelector(".reps");
+          if (row.classList.contains("done")) { kg.value = ""; reps.value = ""; row.classList.remove("done", "ticked"); }
+          else {
+            if (!kg.value && num0(kg.placeholder) != null) kg.value = kg.placeholder;
+            if (!reps.value && num0(reps.placeholder) != null) reps.value = reps.placeholder;
+            row.classList.add("done", "ticked");
+          }
+        } else if (b.dataset.act === "add") {
+          const sets = ex.querySelector(".sets");
+          const n = sets.children.length;
+          sets.insertAdjacentHTML("beforeend", setRow(n, null, num0(ex.dataset.reps)));
+        } else if (b.dataset.act === "repeat") {
+          const prev = lastSets(ex.dataset.ex, ex.closest("form").dataset.date);
+          const sets = ex.querySelector(".sets");
+          while (sets.children.length < prev.sets.length) sets.insertAdjacentHTML("beforeend", setRow(sets.children.length, null, num0(ex.dataset.reps)));
+          [...sets.children].forEach((row, i) => { const p = prev.sets[i]; if (!p) return;
+            row.querySelector(".kg").value = p.kg != null ? fmtNum(p.kg, 2) : ""; row.querySelector(".reps").value = p.reps ?? ""; row.classList.add("done"); });
+        } else if (b.dataset.act === "suggest") {
+          ex.querySelectorAll(".set").forEach((row) => { row.querySelector(".kg").value = fmtNum(Number(b.dataset.kg), 2); row.classList.add("done"); });
+        }
+        refresh(ex);
+      });
+    });
+  }
+
+  // Lee las series marcadas: kg vacío = hereda el de la serie anterior; reps vacías = las del plan
+  function readSets(ex) {
+    const out = [];
+    let carry = num(ex.dataset.base);
+    const target = num(ex.dataset.reps);
+    ex.querySelectorAll(".set").forEach((row) => {
+      const kgV = num(row.querySelector(".kg").value), repsV = num(row.querySelector(".reps").value);
+      if (kgV != null) carry = kgV;
+      if (!row.classList.contains("done")) return;
+      const reps = repsV ?? target;
+      const kg = kgV ?? carry;
+      if (reps == null && kg == null) return;
+      out.push({ kg: kg ?? null, reps: reps ?? null });
+    });
+    return out;
   }
 
   // ——— Sesión ———
@@ -326,7 +474,7 @@
     app.innerHTML = `
       <div class="pager top">${prev ? `<a class="btn ghost" href="#/sesion/${prev.id}">← ${prev.day}</a>` : "<span></span>"}<a class="btn ghost" href="#/plan/${s.week}">Semana ${s.week}</a>${next ? `<a class="btn ghost" href="#/sesion/${next.id}">${next.day} →</a>` : "<span></span>"}</div>
       ${heroSession(s, fmtDate(s.date, true))}
-      <form id="logForm" class="card form" autocomplete="off">
+      <form id="logForm" class="card form" autocomplete="off" data-date="${s.date}">
         <div class="eyebrow">Registro</div><h2>¿Cómo ha ido?</h2>
         ${s.strength.map((k) => strengthBlock(k, s.week, s.id, true)).join("")}
         <label>Estado</label>
@@ -358,6 +506,7 @@
       </form>
     `;
     const form = $("#logForm");
+    bindSets(form);
     form.querySelectorAll(".seg").forEach((g) => g.addEventListener("click", (e) => {
       const b = e.target.closest("button"); if (!b) return;
       const was = b.classList.contains("on");
@@ -377,7 +526,19 @@
         rpe: rpe.dataset.touched === "1" ? Number(rpe.value) : "", metrics: {}, loads: {} };
       ["minutes", "km", "hr", "hrmax", "pace", "weight", "splits", "notes"].forEach((k) => (data[k] = form.elements[k].value.trim()));
       form.querySelectorAll("[data-metric]").forEach((i) => { if (i.value.trim()) data.metrics[i.dataset.metric] = i.value.trim(); });
-      form.querySelectorAll("input.load").forEach((i) => { if (i.value.trim()) data.loads[i.dataset.ex] = i.value.trim(); });
+      data.sets = {};
+      form.querySelectorAll(".exlog").forEach((ex) => {
+        const sets = readSets(ex);
+        const name = ex.dataset.ex;
+        if (sets.length) { data.sets[name] = sets; data.loads[name] = setsSummary(sets); }
+        else if (log.loads?.[name] && !log.sets?.[name]) data.loads[name] = log.loads[name]; // conserva anotaciones antiguas
+      });
+      // Test de 5RM: rellena el resultado con la serie más pesada de 5+ reps si no lo has escrito
+      const top5 = (ex) => { const ss = data.sets[ex] || []; const ok = ss.filter((x) => (x.reps || 0) >= 5 && x.kg); return ok.length ? Math.max(...ok.map((x) => x.kg)) : null; };
+      if (s.metrics === "test5rm") {
+        if (!data.metrics.sq5rm && top5("Sentadilla trasera")) data.metrics.sq5rm = String(top5("Sentadilla trasera"));
+        if (!data.metrics.dl5rm && top5("Peso muerto convencional")) data.metrics.dl5rm = String(top5("Peso muerto convencional"));
+      }
       Store.setLog(id, data);
       toast("Sesión guardada ✓");
       route();
@@ -412,13 +573,35 @@
 
   function loadHistory(k) {
     const rows = STRENGTH[k].rows.map((r) => {
-      const hist = ALL.map((s) => ({ s, l: Store.getLog(s.id) })).filter(({ l }) => l?.loads?.[r.ex]);
+      const hist = ALL.map((s) => ({ s, l: Store.getLog(s.id) })).filter(({ l }) => l?.sets?.[r.ex]?.length || l?.loads?.[r.ex]);
       return { ex: r.ex, hist };
     }).filter((r) => r.hist.length);
-    if (!rows.length) return `<p class="muted tiny mt">Cuando registres cargas en las sesiones, aquí verás su evolución.</p>`;
-    return `<h3 class="mt">Historial de cargas</h3><div class="exlist">
-      ${rows.map((r) => `<div class="ex col"><div class="ex-name">${esc(r.ex)}</div><div>${r.hist.map(({ s, l }) => `<span class="loadchip" title="${fmtDate(s.date)}"><b>S${s.week}</b> ${esc(l.loads[r.ex])}</span>`).join(" ")}</div></div>`).join("")}
+    if (!rows.length) return `<p class="muted tiny mt">Cuando registres series en las sesiones, aquí verás la evolución de kg, volumen y 1RM estimado.</p>`;
+    return `<h3 class="mt">Historial</h3><div class="hist">
+      ${rows.map((r) => {
+        const pts = r.hist.map(({ s, l }) => ({ s, sets: l.sets?.[r.ex], text: l.sets?.[r.ex] ? setsSummary(l.sets[r.ex]) : l.loads[r.ex] }));
+        const withSets = pts.filter((p) => p.sets);
+        const last = withSets[withSets.length - 1], first = withSets[0];
+        const b1 = last ? setsStats(last.sets).top : 0, b0 = first ? setsStats(first.sets).top : 0;
+        const delta = withSets.length > 1 && b0 ? b1 - b0 : null;
+        return `<details class="hist-ex"><summary><span class="ex-name">${esc(r.ex)}</span>
+          <span class="hist-last">${last ? `<b>${esc(kgStr(setsStats(last.sets).top))}${setsStats(last.sets).top ? " kg" : ""}</b>` : ""}${delta != null ? `<small class="${delta >= 0 ? "pos" : "neg"}">${delta >= 0 ? "▲" : "▼"} ${fmtNum(Math.abs(delta), 1)} kg desde S${first.s.week}</small>` : ""}</span>${ico("chev", "chev")}</summary>
+          ${withSets.length > 1 ? spark(withSets.map((p) => setsStats(p.sets).top)) : ""}
+          <table class="tbl"><thead><tr><th>Sem</th><th>Series</th><th>Vol.</th><th>1RM est.</th></tr></thead><tbody>
+          ${pts.slice().reverse().map((p) => { const st = p.sets ? setsStats(p.sets) : null;
+            return `<tr><td><a href="#/sesion/${p.s.id}">S${p.s.week}</a></td><td>${esc(p.text)}</td><td>${st ? fmtNum(st.vol, 0) : "—"}</td><td>${st?.best ? fmtNum(st.best, 0) : "—"}</td></tr>`; }).join("")}
+          </tbody></table></details>`;
+      }).join("")}
     </div>`;
+  }
+
+  function spark(vals) {
+    const W = 300, H = 46, p = 5;
+    const lo = Math.min(...vals), hi = Math.max(...vals), rng = hi - lo || 1;
+    const x = (i) => p + (W - 2 * p) * (i / (vals.length - 1));
+    const y = (v) => H - p - (H - 2 * p) * ((v - lo) / rng);
+    const d = vals.map((v, i) => `${i ? "L" : "M"}${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(" ");
+    return `<div class="chart spark"><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true"><path class="l-real" d="${d}"/>${vals.map((v, i) => `<circle class="pt" cx="${x(i)}" cy="${y(v)}" r="3.5"/>`).join("")}</svg></div>`;
   }
 
   function metricValue(key) {
