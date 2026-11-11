@@ -2,14 +2,14 @@
 const STORE_KEY = "mi-planning";
 
 const Store = (() => {
-  let state = { version: 1, logs: {}, diet: {}, settings: { activeTarget: "A" } };
+  let state = { version: 1, logs: {}, diet: {}, foods: {}, settings: { activeTarget: "A" } };
 
   function load() {
     try {
       const raw = localStorage.getItem(STORE_KEY);
       if (raw) {
         const parsed = JSON.parse(raw);
-        state = { ...state, ...parsed, diet: parsed.diet || {}, settings: { ...state.settings, ...(parsed.settings || {}) } };
+        state = { ...state, ...parsed, diet: parsed.diet || {}, foods: parsed.foods || {}, settings: { ...state.settings, ...(parsed.settings || {}) } };
       }
     } catch (e) {
       console.warn("No se pudo leer el almacenamiento local", e);
@@ -32,6 +32,9 @@ const Store = (() => {
     get logs() { return state.logs; },
     get settings() { return state.settings; },
     get diet() { return state.diet; },
+    get foods() { return state.foods || {}; },
+    setFood(key, food) { state.foods = { ...(state.foods || {}), [key]: food }; save(); },
+    deleteFood(key) { delete state.foods[key]; save(); },
     getDay(date) { return state.diet[date] || null; },
     setDay(date, day) { state.diet[date] = { ...day, updatedAt: new Date().toISOString() }; save(); },
     getLog(id) { return state.logs[id] || null; },
@@ -54,11 +57,12 @@ const Store = (() => {
       else if (!data.diet) throw new Error("El archivo no contiene registros.");
       if (mode === "replace") state.logs = logs;
       else state.logs = { ...state.logs, ...logs };
+      if (data.foods) state.foods = { ...(state.foods || {}), ...data.foods };
       if (data.diet) state.diet = mode === "replace" ? data.diet : { ...state.diet, ...data.diet };
       if (data.settings) state.settings = { ...state.settings, ...data.settings };
       save();
       return Object.keys(logs).length + Object.keys(data.diet || {}).length;
     },
-    reset() { state = { version: 1, logs: {}, diet: {}, settings: { activeTarget: "A" } }; save(); },
+    reset() { state = { version: 1, logs: {}, diet: {}, foods: {}, settings: { activeTarget: "A" } }; save(); },
   };
 })();

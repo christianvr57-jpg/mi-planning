@@ -1,36 +1,16 @@
 // Nutrición: volumen (ganar masa muscular al máximo)
 // Base: 81 kg · 1,84 m · entreno a media mañana · 4 comidas · poco apetito → calorías líquidas.
-// Valores por 100 g (o 100 ml). Para "ud", unitG = gramos por unidad.
 
-const FOODS = {
-  avena: { name: "Copos de avena", k: 375, p: 13.5, c: 60, f: 7, unit: "g" },
-  leche: { name: "Leche entera", k: 63, p: 3.2, c: 4.7, f: 3.5, unit: "ml" },
-  whey: { name: "Proteína whey", k: 400, p: 78, c: 8, f: 6, unit: "g" },
-  platano: { name: "Plátano", k: 89, p: 1.1, c: 23, f: 0.3, unit: "ud", unitG: 120 },
-  cacahuete: { name: "Crema de cacahuete", k: 600, p: 25, c: 14, f: 50, unit: "g" },
-  huevo: { name: "Huevos", k: 143, p: 12.6, c: 0.7, f: 9.5, unit: "ud", unitG: 60 },
-  pan: { name: "Pan", k: 265, p: 9, c: 50, f: 2.5, unit: "g" },
-  aceite: { name: "Aceite de oliva", k: 884, p: 0, c: 0, f: 100, unit: "g" },
-  arroz: { name: "Arroz (en crudo)", k: 355, p: 7, c: 79, f: 0.6, unit: "g" },
-  pasta: { name: "Pasta (en crudo)", k: 355, p: 12.5, c: 72, f: 1.5, unit: "g" },
-  patata: { name: "Patata (en crudo)", k: 77, p: 2, c: 17, f: 0.1, unit: "g" },
-  pollo: { name: "Pechuga de pollo (en crudo)", k: 110, p: 23, c: 0, f: 1.5, unit: "g" },
-  ternera: { name: "Ternera picada 5 % (en crudo)", k: 135, p: 21, c: 0, f: 5.5, unit: "g" },
-  salmon: { name: "Salmón", k: 200, p: 20, c: 0, f: 13, unit: "g" },
-  atun: { name: "Atún al natural (escurrido)", k: 110, p: 25, c: 0, f: 1, unit: "g" },
-  skyr: { name: "Skyr o yogur proteico", k: 63, p: 11, c: 4, f: 0.2, unit: "g" },
-  miel: { name: "Miel", k: 304, p: 0.3, c: 82, f: 0, unit: "g" },
-  nueces: { name: "Frutos secos", k: 620, p: 18, c: 10, f: 55, unit: "g" },
-  verdura: { name: "Verdura", k: 30, p: 2, c: 5, f: 0.3, unit: "g" },
-  tomate: { name: "Tomate triturado", k: 40, p: 1.5, c: 7, f: 1, unit: "g" },
-  zumo: { name: "Zumo de naranja", k: 45, p: 0.7, c: 10.4, f: 0.2, unit: "ml" },
-  parmesano: { name: "Queso parmesano", k: 400, p: 33, c: 0, f: 28, unit: "g" },
-  wrap: { name: "Tortillas de trigo", k: 300, p: 8.5, c: 50, f: 7, unit: "g" },
-  aguacate: { name: "Aguacate", k: 160, p: 2, c: 9, f: 15, unit: "g" },
-  fruta: { name: "Fruta (manzana, naranja…)", k: 52, p: 0.3, c: 13, f: 0.2, unit: "g" },
-  datiles: { name: "Dátiles", k: 280, p: 2.5, c: 75, f: 0.4, unit: "g" },
-  creatina: { name: "Creatina monohidrato", k: 0, p: 0, c: 0, f: 0, unit: "g" },
-};
+// Los alimentos salen de la base local (foods-db.js) más los que crees tú ("Mis alimentos").
+const FOODS = FOOD_DB_MAP;
+function getFood(key) {
+  const custom = typeof Store !== "undefined" ? Store.foods[key] : null;
+  return custom || FOOD_DB_MAP[key] || { key, name: key, k: 0, p: 0, c: 0, f: 0, unit: "g", base: "g" };
+}
+function allFoods() {
+  const custom = typeof Store !== "undefined" ? Object.values(Store.foods) : [];
+  return [...custom, ...FOOD_DB.map((x) => FOOD_DB_MAP[x[0]])];
+}
 
 // Tipos de día según la sesión del plan
 const DAY_TYPES = {
@@ -101,7 +81,7 @@ const DIET_RULES = [
 const dayIdx = (type) => Math.max(0, DAY_ORDER.indexOf(type));
 function itemGrams(item, type) { return Array.isArray(item[1]) ? item[1][dayIdx(type)] : item[1]; }
 function macrosOf(key, g) {
-  const f = FOODS[key];
+  const f = getFood(key);
   const m = g / 100;
   return { k: f.k * m, p: f.p * m, c: f.c * m, f: f.f * m };
 }
@@ -109,10 +89,10 @@ function sumMacros(list) {
   return list.reduce((a, x) => ({ k: a.k + x.k, p: a.p + x.p, c: a.c + x.c, f: a.f + x.f }), { k: 0, p: 0, c: 0, f: 0 });
 }
 function fmtAmount(key, g) {
-  const f = FOODS[key];
-  if (f.unit === "ud") {
+  const f = getFood(key);
+  if (f.unit === "ud" && f.unitG) {
     const n = Math.round((g / f.unitG) * 2) / 2;
     return `${String(n).replace(".", ",")} ud`;
   }
-  return `${Math.round(g)} ${f.unit === "ml" ? "ml" : "g"}`;
+  return `${Math.round(g)} ${f.base === "ml" || f.unit === "ml" ? "ml" : "g"}`;
 }
