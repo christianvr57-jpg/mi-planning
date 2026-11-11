@@ -2,14 +2,14 @@
 const STORE_KEY = "mi-planning";
 
 const Store = (() => {
-  let state = { version: 1, logs: {}, settings: { activeTarget: "A" } };
+  let state = { version: 1, logs: {}, diet: {}, settings: { activeTarget: "A" } };
 
   function load() {
     try {
       const raw = localStorage.getItem(STORE_KEY);
       if (raw) {
         const parsed = JSON.parse(raw);
-        state = { ...state, ...parsed, settings: { ...state.settings, ...(parsed.settings || {}) } };
+        state = { ...state, ...parsed, diet: parsed.diet || {}, settings: { ...state.settings, ...(parsed.settings || {}) } };
       }
     } catch (e) {
       console.warn("No se pudo leer el almacenamiento local", e);
@@ -31,6 +31,9 @@ const Store = (() => {
   return {
     get logs() { return state.logs; },
     get settings() { return state.settings; },
+    get diet() { return state.diet; },
+    getDay(date) { return state.diet[date] || null; },
+    setDay(date, day) { state.diet[date] = { ...day, updatedAt: new Date().toISOString() }; save(); },
     getLog(id) { return state.logs[id] || null; },
     setLog(id, log) {
       state.logs[id] = { ...log, sessionId: id, updatedAt: new Date().toISOString() };
@@ -48,13 +51,14 @@ const Store = (() => {
       if (Array.isArray(data)) data.forEach((l) => { if (l.sessionId) logs[l.sessionId] = l; });
       else if (data.logs && Array.isArray(data.logs)) data.logs.forEach((l) => { if (l.sessionId) logs[l.sessionId] = l; });
       else if (data.logs) logs = data.logs;
-      else throw new Error("El archivo no contiene registros (logs).");
+      else if (!data.diet) throw new Error("El archivo no contiene registros.");
       if (mode === "replace") state.logs = logs;
       else state.logs = { ...state.logs, ...logs };
+      if (data.diet) state.diet = mode === "replace" ? data.diet : { ...state.diet, ...data.diet };
       if (data.settings) state.settings = { ...state.settings, ...data.settings };
       save();
-      return Object.keys(logs).length;
+      return Object.keys(logs).length + Object.keys(data.diet || {}).length;
     },
-    reset() { state = { version: 1, logs: {}, settings: { activeTarget: "A" } }; save(); },
+    reset() { state = { version: 1, logs: {}, diet: {}, settings: { activeTarget: "A" } }; save(); },
   };
 })();

@@ -120,6 +120,7 @@
     const tabs = [["hoy", "Hoy", "M3 10.5 12 3l9 7.5V21h-6v-6H9v6H3z"],
       ["plan", "Plan", "M8 2v4M16 2v4M3 9h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"],
       ["fuerza", "Fuerza", ICON.strength],
+      ["nutricion", "Comida", "M7 2v20M4 2v6a3 3 0 0 0 6 0V2M17 2c-1.7 0-3 2.2-3 5s1.3 5 3 5v10M17 2c1.7 0 3 2.2 3 5s-1.3 5-3 5"],
       ["progreso", "Progreso", "M3 3v18h18M7 15l4-4 3 3 6-6"],
       ["guia", "Guía", "M4 19.5A2.5 2.5 0 0 1 6.5 17H20V3H6.5A2.5 2.5 0 0 0 4 5.5zM4 19.5A2.5 2.5 0 0 0 6.5 22H20v-5"]];
     $("#topbar").innerHTML = `
@@ -195,6 +196,9 @@
         <div class="greet-right"><b>Día ${dayN}</b><small>de ${ALL.length}</small></div>
       </section>
       ${heroSession(s, before ? "Primera sesión · " + fmtDate(s.date, true) : s.date === t ? "Hoy" : "Última sesión · " + fmtDate(s.date, true))}
+      ${(() => { const nst = dayState(t), ntg = targetsFor(nst.type), ne = consumed(t), np = Math.min(100, Math.round((ne.k / ntg.kcal) * 100));
+        return `<a class="card nutmini" href="#/nutricion"><div class="nm-ring">${ring(np, 52, 6)}<span>${np}%</span></div>
+          <div class="nm-body"><div class="eyebrow">Comida · ${DAY_TYPES[nst.type].name}</div><b>${fmtNum(ne.k, 0)} / ${fmtNum(ntg.kcal, 0)} kcal</b><small>Proteína ${Math.round(ne.p)}/${ntg.p} g${nst.weight ? ` · ${esc(nst.weight)} kg` : " · pésate en ayunas"}</small></div>${ico("chev")}</a>`; })()}
       <section class="card">
         <div class="row-between"><div><div class="eyebrow">Semana ${w.week}</div><h2>${esc(w.title)}</h2></div><a class="link" href="#/plan/${w.week}">Ver semana ${ico("chev")}</a></div>
         <div class="weekstrip">${w.sessions.map((x) => `<a href="#/sesion/${x.id}" class="int-${x.intensity} ${x.id === s.id ? "on" : ""} st-${statusKey(x)}">
@@ -263,6 +267,7 @@
     lines.push(`Ritmo objetivo activo: ${target()} (${ATHLETE.targets[target()].pace})`);
     lines.push(`Sesiones: ${st.done} hechas, ${st.partial} parciales, ${st.skipped} no hechas de ${st.planned} · Km carrera: ${fmtNum(st.km)} / ~${w.km} · Tiempo: ${Math.round(st.min)}' · RPE medio: ${st.rpe ? fmtNum(st.rpe) : "—"}`);
     lines.push(`Semáforo: verde ${st.fat.verde}, amarillo ${st.fat.amarillo}, rojo ${st.fat.rojo}`);
+    nutritionSummaryLines(w).forEach((x) => lines.push(x));
     lines.push("");
     w.sessions.forEach((s) => {
       const l = Store.getLog(s.id);
@@ -645,7 +650,7 @@
         <div class="legend"><span><i class="sw sw-plan"></i>Planificado</span><span><i class="sw sw-real"></i>Registrado</span></div>
         ${kmChart()}</section>
       <section class="card"><h2>Carga semanal</h2><p class="muted">Sesiones hechas, km, horas, RPE medio y semáforo.</p>${loadTable()}</section>
-      <section class="card"><h2>Peso corporal</h2><p class="muted">Referencia: estable en torno a ${ATHLETE.weightRef} kg. Si bajas más de 1 kg en 2 semanas, suma ~300 kcal/día.</p>${weightChart()}</section>
+      <section class="card"><h2>Peso corporal</h2><p class="muted">Fase de volumen: objetivo +0,4 a +0,7 kg por semana (media de 7 días).</p>${weightChart()}</section>
       ${stationTable()}
       ${testsTable()}
     `;
@@ -682,20 +687,23 @@
   }
 
   function weightChart() {
-    const pts = ALL.map((s) => ({ s, v: num(Store.getLog(s.id)?.weight) })).filter((p) => p.v);
-    if (pts.length < 2) return `<p class="muted tiny">${pts.length ? `Último peso: ${fmtNum(pts[0].v)} kg. ` : ""}Apunta tu peso en ayunas dos veces por semana en el registro de cualquier sesión.</p>`;
+    const pts = weightSeries();
+    if (pts.length < 2) return `<p class="muted tiny">${pts.length ? `Último peso: ${fmtNum(pts[pts.length - 1].v)} kg. ` : ""}Apunta tu peso cada mañana en <a class="link" href="#/nutricion">Comida</a>.</p>`;
     const W = 420, H = 170, pl = 30, pr = 12, pt = 12, pb = 26;
     const vals = pts.map((p) => p.v);
     const lo = Math.floor(Math.min(...vals, ATHLETE.weightRef) - 1), hi = Math.ceil(Math.max(...vals, ATHLETE.weightRef) + 1);
-    const t0 = Date.parse(PLAN_START), t1 = Date.parse(PLAN_END);
+    const t0 = Date.parse(PLAN_START), t1 = Math.max(Date.parse(PLAN_END), Date.parse(pts[pts.length - 1].date));
     const x = (d) => pl + (W - pl - pr) * ((Date.parse(d) - t0) / (t1 - t0));
     const y = (v) => pt + (H - pt - pb) * (1 - (v - lo) / (hi - lo));
-    const path = pts.map((p, i) => `${i ? "L" : "M"}${x(p.s.date).toFixed(1)},${y(p.v).toFixed(1)}`).join(" ");
-    return `<div class="chart"><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Evolución del peso">
+    const avg = pts.map((p) => ({ date: p.date, v: avgWeight(pts, p.date).avg }));
+    const path = avg.map((p, i) => `${i ? "L" : "M"}${x(p.date).toFixed(1)},${y(p.v).toFixed(1)}`).join(" ");
+    return `<div class="legend"><span><i class="sw sw-plan"></i>Pesaje</span><span><i class="sw sw-real"></i>Media 7 días</span></div>
+    <div class="chart"><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Evolución del peso">
       ${[lo, ATHLETE.weightRef, hi].map((v) => `<line class="grid ${v === ATHLETE.weightRef ? "ref" : ""}" x1="${pl}" x2="${W - pr}" y1="${y(v)}" y2="${y(v)}"/><text class="axis" x="${pl - 6}" y="${y(v) + 4}" text-anchor="end">${v}</text>`).join("")}
       ${[1, 5, 9, 13].map((wk) => `<text class="axis" x="${x(WEEKS[wk - 1].start)}" y="${H - 6}" text-anchor="middle">S${wk}</text>`).join("")}
+      ${pts.map((p) => `<circle class="pt-raw" cx="${x(p.date)}" cy="${y(p.v)}" r="3"/>`).join("")}
       <path class="l-real" d="${path}"/>
-      ${pts.map((p) => `<g class="hit" data-tip="${fmtDate(p.s.date)}: ${fmtNum(p.v)} kg"><circle cx="${x(p.s.date)}" cy="${y(p.v)}" r="12" fill="transparent"/><circle class="pt" cx="${x(p.s.date)}" cy="${y(p.v)}" r="4"/></g>`).join("")}
+      ${pts.map((p, i) => `<g class="hit" data-tip="${fmtDate(p.date)}: ${fmtNum(p.v)} kg · media ${fmtNum(avg[i].v, 1)}"><circle cx="${x(p.date)}" cy="${y(p.v)}" r="10" fill="transparent"/></g>`).join("")}
     </svg></div>`;
   }
 
@@ -775,6 +783,228 @@
       `<div><span class="zchip z-${n.toLowerCase()}">${n}</span><b>${a ? Math.round(hr * a) : "<"}${b ? (a ? "–" : "") + Math.round(hr * b) : "+"}</b></div>`).join("")}</div>`;
   }
 
+  // ——— Nutrición ———
+  const isoAdd = (iso, n) => addDays(iso, n);
+  function sessionOn(date) { return ALL.find((s) => s.date === date) || null; }
+  function autoDayType(date) { const s = sessionOn(date); return s ? INTENSITY_TO_DAY[s.intensity] || "suave" : "suave"; }
+  function dayState(date) {
+    const d = Store.getDay(date) || {};
+    return { type: d.type || autoDayType(date), auto: !d.type, opts: d.opts || {}, done: d.done || {}, extras: d.extras || {}, weight: d.weight || "", raw: d };
+  }
+  function saveDay(date, patch) { const cur = Store.getDay(date) || {}; Store.setDay(date, { ...cur, ...patch }); }
+  const boost = () => Number(Store.settings.dietBoost || 0);
+  function targetsFor(type) {
+    const t = DAY_TYPES[type], b = boost();
+    return { kcal: t.kcal + b * 250, p: t.p, c: t.c + b * 40, f: t.f + b * 10 };
+  }
+  function mealOption(meal, st) { return meal.options.find((o) => o.id === (st.opts[meal.id] || "A")) || meal.options[0]; }
+  function consumed(date) {
+    const st = dayState(date);
+    const parts = [];
+    MEALS.forEach((m) => {
+      const opt = mealOption(m, st);
+      const done = st.done[m.id] || [];
+      opt.items.forEach((it, i) => { if (done[i]) parts.push(macrosOf(it[0], itemGrams(it, st.type))); });
+    });
+    EXTRAS.forEach((e) => { const n = st.extras[e.id] || 0; for (let i = 0; i < n; i++) e.items.forEach((it) => parts.push(macrosOf(it[0], it[1]))); });
+    return sumMacros(parts);
+  }
+  // Serie de pesos: diario de nutrición + registros de sesión
+  function weightSeries() {
+    const map = {};
+    ALL.forEach((s) => { const v = num(Store.getLog(s.id)?.weight); if (v) map[s.date] = v; });
+    Object.entries(Store.diet).forEach(([d, x]) => { const v = num(x.weight); if (v) map[d] = v; });
+    return Object.keys(map).sort().map((d) => ({ date: d, v: map[d] }));
+  }
+  function avgWeight(series, endDate, days = 7) {
+    const start = isoAdd(endDate, -(days - 1));
+    const v = series.filter((p) => p.date >= start && p.date <= endDate).map((p) => p.v);
+    return v.length ? { avg: v.reduce((a, b) => a + b, 0) / v.length, n: v.length } : null;
+  }
+  function weightTrend(date) {
+    const ser = weightSeries();
+    const cur = avgWeight(ser, date), prev = avgWeight(ser, isoAdd(date, -7)), prev2 = avgWeight(ser, isoAdd(date, -14));
+    const rate = cur && prev && cur.n >= 3 && prev.n >= 3 ? cur.avg - prev.avg : null;
+    const rate2 = prev && prev2 && prev.n >= 3 && prev2.n >= 3 ? prev.avg - prev2.avg : null;
+    let advice = null;
+    if (rate != null && rate2 != null) {
+      if (rate < 0.25 && rate2 < 0.25) advice = { dir: 1, text: "Llevas 2 semanas subiendo menos de 0,25 kg/semana: toca comer más." };
+      else if (rate > 1 && rate2 > 1) advice = { dir: -1, text: "Subes más de 1 kg/semana: gran parte es grasa. Baja un poco." };
+      else advice = { dir: 0, text: "Ritmo de subida correcto. Mantén las calorías." };
+    }
+    return { cur, prev, rate, advice };
+  }
+
+  function macroBar(label, val, tgt, cls) {
+    const pct = Math.min(100, (val / tgt) * 100);
+    return `<div class="mbar ${cls}"><div class="mbar-top"><span>${label}</span><b>${Math.round(val)}<small> / ${tgt} g</small></b></div><div class="mbar-track"><i style="width:${pct}%"></i></div></div>`;
+  }
+
+  function viewNutricion(arg) {
+    if (arg === "pautas") return viewPautas();
+    if (arg === "compra") return viewCompra();
+    const date = /^\d{4}-\d{2}-\d{2}$/.test(arg || "") ? arg : todayISO();
+    const st = dayState(date);
+    const tg = targetsFor(st.type);
+    const eat = consumed(date);
+    const s = sessionOn(date);
+    const tr = weightTrend(date);
+    const pct = Math.min(100, Math.round((eat.k / tg.kcal) * 100));
+    const left = Math.round(tg.kcal - eat.k);
+    app.innerHTML = `
+      <section class="pagehead"><div class="row-between">
+        <div><div class="eyebrow">${date === todayISO() ? "Hoy · " : ""}${fmtDate(date, true)}</div><h1 class="display">Nutrición</h1></div>
+        <div class="daynav"><a class="iconbtn" href="#/nutricion/${isoAdd(date, -1)}" aria-label="Día anterior">‹</a>${date !== todayISO() ? `<a class="iconbtn txt" href="#/nutricion">Hoy</a>` : ""}<a class="iconbtn" href="#/nutricion/${isoAdd(date, 1)}" aria-label="Día siguiente">›</a></div>
+      </div>
+      <div class="seg mt" id="dayType">${DAY_ORDER.map((k) => `<button data-v="${k}" class="${st.type === k ? "on" : ""}">${DAY_TYPES[k].short}</button>`).join("")}</div>
+      <p class="muted tiny daytype-note">${st.auto ? "Automático según el plan" : "Elegido a mano"}${s ? ` · <a class="link" href="#/sesion/${s.id}">${esc(s.title)}</a>` : ""}${!st.auto ? ` · <a href="#" id="autoType" class="link">volver a automático</a>` : ""}</p></section>
+      <section class="card kcalcard">
+        <div class="kcal-ring">${ring(pct, 104, 10)}<div><b>${fmtNum(eat.k, 0)}</b><small>de ${fmtNum(tg.kcal, 0)} kcal</small></div></div>
+        <div class="kcal-side">
+          <div class="kcal-left ${left <= 0 ? "ok" : ""}">${left > 0 ? `Faltan <b>${fmtNum(left, 0)}</b> kcal` : `Objetivo cumplido ✓`}</div>
+          ${macroBar("Proteína", eat.p, tg.p, "m-p")}${macroBar("Hidratos", eat.c, tg.c, "m-c")}${macroBar("Grasa", eat.f, tg.f, "m-f")}
+        </div>
+      </section>
+      <section class="card">
+        <div class="row-between"><div><div class="eyebrow">En ayunas</div><h2>Peso</h2></div>
+          <div class="weight-in"><input id="wIn" inputmode="decimal" value="${esc(st.weight)}" placeholder="kg" aria-label="Peso del día"><span>kg</span></div></div>
+        <div class="kpis three">
+          <div><span>Media 7 días</span><b>${tr.cur ? fmtNum(tr.cur.avg, 1) : "—"}</b></div>
+          <div><span>Semana anterior</span><b>${tr.prev ? fmtNum(tr.prev.avg, 1) : "—"}</b></div>
+          <div><span>Cambio/semana</span><b class="${tr.rate == null ? "" : tr.rate >= 0.25 ? "pos" : "neg"}">${tr.rate == null ? "—" : (tr.rate >= 0 ? "+" : "") + fmtNum(tr.rate, 2)}</b></div>
+        </div>
+        <p class="muted tiny">Objetivo: +0,4 a +0,7 kg por semana.${boost() ? ` Ajuste actual: <b>${boost() > 0 ? "+" : ""}${boost() * 250} kcal/día</b>.` : ""}</p>
+        ${tr.advice ? `<div class="advice d${tr.advice.dir}"><span>${esc(tr.advice.text)}</span>${tr.advice.dir ? `<button class="btn ${tr.advice.dir > 0 ? "primary" : ""}" id="applyBoost" data-d="${tr.advice.dir}">${tr.advice.dir > 0 ? "Subir 250 kcal/día" : "Bajar 250 kcal/día"}</button>` : ""}</div>`
+          : `<p class="muted tiny">Con 3+ pesajes en cada una de las últimas semanas te diré si hay que subir o bajar calorías.</p>`}
+      </section>
+      ${MEALS.map((m) => {
+        const opt = mealOption(m, st);
+        const done = st.done[m.id] || [];
+        const all = opt.items.every((it, i) => done[i] || !itemGrams(it, st.type));
+        const mm = sumMacros(opt.items.map((it) => macrosOf(it[0], itemGrams(it, st.type))));
+        return `<section class="card meal ${all ? "complete" : ""}" data-meal="${m.id}">
+          <div class="meal-head"><div><div class="eyebrow">${m.time}</div><h2>${m.name}</h2></div>
+            <button class="mealcheck" data-all="${all ? 1 : 0}" aria-label="Marcar comida completa">${ico("check")}</button></div>
+          ${m.options.length > 1 ? `<div class="seg mini opts">${m.options.map((o) => `<button data-opt="${o.id}" class="${o.id === opt.id ? "on" : ""}">${esc(o.name)}</button>`).join("")}</div>` : ""}
+          <ul class="foods">${opt.items.map((it, i) => { const g = itemGrams(it, st.type); if (!g) return "";
+            const mc = macrosOf(it[0], g);
+            return `<li class="${done[i] ? "on" : ""}" data-i="${i}"><span class="fcheck">${ico("check")}</span><span class="fname">${esc(FOODS[it[0]].name)}</span><span class="famt">${fmtAmount(it[0], g)}</span><span class="fk">${mc.k ? Math.round(mc.k) : ""}</span></li>`; }).join("")}</ul>
+          <div class="meal-foot"><span>${Math.round(mm.k)} kcal</span><span>P ${Math.round(mm.p)} · H ${Math.round(mm.c)} · G ${Math.round(mm.f)}</span></div>
+          <p class="muted tiny">${esc(m.note)}</p>
+        </section>`;
+      }).join("")}
+      <section class="card"><div class="eyebrow">Si te falta</div><h2>Extras</h2>
+        <div class="extras">${EXTRAS.map((e) => { const n = st.extras[e.id] || 0; const k = Math.round(sumMacros(e.items.map((it) => macrosOf(it[0], it[1]))).k);
+          return `<div class="extra ${n ? "on" : ""}" data-x="${e.id}"><div><b>${esc(e.name)}</b><small>${e.items.map((it) => `${fmtAmount(it[0], it[1])} ${FOODS[it[0]].name.toLowerCase()}`).join(" + ")} · ${k} kcal</small></div>
+            <div class="counter"><button data-d="-1" aria-label="Quitar">−</button><span>${n}</span><button data-d="1" aria-label="Añadir">+</button></div></div>`; }).join("")}</div>
+      </section>
+      <div class="pager"><a class="btn" href="#/nutricion/pautas">Pautas</a><a class="btn" href="#/nutricion/compra">Lista de la compra</a></div>
+    `;
+    const rerender = () => { const y = window.scrollY; header("nutricion"); viewNutricion(date); window.scrollTo(0, y); };
+    $("#dayType").onclick = (e) => { const b = e.target.closest("button"); if (!b) return; saveDay(date, { type: b.dataset.v === autoDayType(date) ? null : b.dataset.v }); rerender(); };
+    const at = $("#autoType"); if (at) at.onclick = (e) => { e.preventDefault(); saveDay(date, { type: null }); rerender(); };
+    $("#wIn").onchange = (e) => { saveDay(date, { weight: e.target.value.trim() }); toast("Peso guardado ✓"); rerender(); };
+    const ab = $("#applyBoost"); if (ab) ab.onclick = () => { Store.setSetting("dietBoost", boost() + Number(ab.dataset.d)); toast(`Calorías ${ab.dataset.d > 0 ? "+" : "−"}250 kcal/día`); rerender(); };
+    app.querySelectorAll(".meal").forEach((card) => {
+      const mid = card.dataset.meal;
+      const meal = MEALS.find((m) => m.id === mid);
+      card.addEventListener("click", (e) => {
+        const cur = dayState(date);
+        const done = [...(cur.done[mid] || [])];
+        const ob = e.target.closest("[data-opt]");
+        if (ob) { saveDay(date, { opts: { ...cur.opts, [mid]: ob.dataset.opt }, done: { ...cur.done, [mid]: [] } }); return rerender(); }
+        const li = e.target.closest("li[data-i]");
+        if (li) { const i = +li.dataset.i; done[i] = !done[i]; saveDay(date, { done: { ...cur.done, [mid]: done } }); return rerender(); }
+        const mc = e.target.closest(".mealcheck");
+        if (mc) {
+          const n = mealOption(meal, cur).items.length;
+          saveDay(date, { done: { ...cur.done, [mid]: Array.from({ length: n }, () => mc.dataset.all !== "1") } });
+          return rerender();
+        }
+      });
+    });
+    app.querySelectorAll(".extra").forEach((x) => x.addEventListener("click", (e) => {
+      const b = e.target.closest("button"); if (!b) return;
+      const cur = dayState(date);
+      const n = Math.max(0, (cur.extras[x.dataset.x] || 0) + Number(b.dataset.d));
+      saveDay(date, { extras: { ...cur.extras, [x.dataset.x]: n } });
+      rerender();
+    }));
+  }
+
+  function viewPautas() {
+    app.innerHTML = `
+      <section class="pagehead"><a class="link" href="#/nutricion">‹ Nutrición</a><h1 class="display">Pautas</h1>
+        <p class="muted">Fase de volumen: ganar toda la masa muscular posible. Superávit de ~500–700 kcal sobre tu gasto.</p></section>
+      <section class="card"><h2>Objetivos por tipo de día</h2>
+        <div class="scroll-x"><table class="tbl"><thead><tr><th>Día</th><th>kcal</th><th>Prot.</th><th>Hidr.</th><th>Grasa</th></tr></thead><tbody>
+        ${DAY_ORDER.map((k) => { const t = targetsFor(k); return `<tr><td><b>${DAY_TYPES[k].name}</b><small class="src">${DAY_TYPES[k].why}</small></td><td>${fmtNum(t.kcal, 0)}</td><td>${t.p} g</td><td>${t.c} g</td><td>${t.f} g</td></tr>`; }).join("")}
+        </tbody></table></div>
+        <p class="muted tiny">Media semanal ≈ ${fmtNum((4 * targetsFor("duro").kcal + targetsFor("medio").kcal + 2 * targetsFor("suave").kcal) / 7, 0)} kcal/día. El tipo de día sale solo de la sesión del plan.${boost() ? ` Incluye tu ajuste de ${boost() > 0 ? "+" : ""}${boost() * 250} kcal.` : ""}</p>
+        ${boost() ? `<button class="btn ghost" id="resetBoost">Quitar ajuste de calorías</button>` : ""}
+      </section>
+      <section class="card"><h2>Reglas</h2><ul class="bul">${DIET_RULES.map((r) => `<li>${esc(r)}</li>`).join("")}</ul></section>
+      <section class="card"><h2>Horario tipo</h2><p class="muted">Entreno a media mañana.</p>
+        <div class="timeline-v">
+          <div><b>08:00</b><span>Desayuno: hidratos y algo de proteína, poca grasa y fibra.</span></div>
+          <div><b>10:00–12:00</b><span>Entreno. Agua; en sesiones de más de 75' o simulacros, 30–60 g de hidratos (zumo, dátiles o bebida isotónica).</span></div>
+          <div><b>Al terminar</b><span>Batido: whey + plátano + 5 g de creatina.</span></div>
+          <div><b>13:00</b><span>Comida grande: el plato más fuerte del día.</span></div>
+          <div><b>17:30</b><span>Merienda: batido ganador casero (~1.000 kcal).</span></div>
+          <div><b>21:00</b><span>Cena + skyr. Si te falta, un extra antes de dormir.</span></div>
+        </div></section>
+      <section class="card"><h2>Suplementos</h2><ul class="bul">
+        <li><b>Creatina monohidrato:</b> 5 g/día, todos los días.</li>
+        <li><b>Proteína whey:</b> solo para cuadrar la proteína; la comida va primero.</li>
+        <li><b>Cafeína (opcional):</b> 3 mg/kg (~240 mg) 45' antes de sesiones duras, nunca después de las 15:00.</li>
+        <li>Si te haces analítica, revisa vitamina D y hierro: con este volumen de carrera se resienten.</li></ul></section>
+      <section class="card"><h2>Trucos para comer más</h2><ul class="bul">
+        <li>Bebe calorías: leche entera, zumo y el batido ganador llenan mucho menos que la comida sólida.</li>
+        <li>Aceite de oliva generoso en arroz, pasta y patatas: 10 g son 90 kcal invisibles.</li>
+        <li>Prepara el batido ganador por la mañana y bébelo en 2–3 veces si te cuesta de golpe.</li>
+        <li>Menos verdura en las comidas grandes y más en las de los días suaves: sacia sin aportar.</li>
+        <li>Cocina por tandas el domingo (arroz, pasta, pollo, ternera) para que la comida nunca dependa de las ganas.</li></ul></section>
+      <p class="muted tiny">Pauta orientativa para una persona sana. Si tienes algún problema médico, consúltala con un profesional.</p>
+    `;
+    const rb = $("#resetBoost"); if (rb) rb.onclick = () => { Store.setSetting("dietBoost", 0); toast("Ajuste quitado"); viewPautas(); };
+  }
+
+  function viewCompra() {
+    const wn = currentWeekNum();
+    const w = WEEKS[wn - 1];
+    const tot = {};
+    w.sessions.forEach((s) => {
+      const st = dayState(s.date);
+      MEALS.forEach((m) => mealOption(m, st).items.forEach((it) => { tot[it[0]] = (tot[it[0]] || 0) + itemGrams(it, st.type); }));
+    });
+    const fmt = (k, g) => {
+      const f = FOODS[k];
+      if (f.unit === "ud") return `${Math.ceil(g / f.unitG)} ud`;
+      if (g >= 1000) return `${fmtNum(Math.ceil(g / 100) / 10, 1)} ${f.unit === "ml" ? "L" : "kg"}`;
+      return `${Math.ceil(g / 10) * 10} ${f.unit === "ml" ? "ml" : "g"}`;
+    };
+    const rows = Object.entries(tot).filter(([, g]) => g > 0).sort((a, b) => FOODS[a[0]].name.localeCompare(FOODS[b[0]].name));
+    const text = `Lista de la compra · semana ${wn} (${fmtDate(w.start)} – ${fmtDate(w.end)})\n` + rows.map(([k, g]) => `- ${FOODS[k].name}: ${fmt(k, g)}`).join("\n");
+    app.innerHTML = `
+      <section class="pagehead"><a class="link" href="#/nutricion">‹ Nutrición</a><h1 class="display">La compra</h1>
+        <p class="muted">Semana ${wn} · ${fmtDate(w.start)} – ${fmtDate(w.end)}. Calculada con el tipo de cada día y las opciones de menú que tengas elegidas (por defecto, la A).</p></section>
+      <section class="card"><ul class="shop">${rows.map(([k, g]) => `<li><span>${esc(FOODS[k].name)}</span><b>${fmt(k, g)}</b></li>`).join("")}</ul>
+        <button class="btn primary block mt" id="copyShop">${ico("copy")} Copiar lista</button></section>
+      <p class="muted tiny">No incluye los extras. Arroz, pasta y patata, en crudo.</p>
+    `;
+    $("#copyShop").onclick = () => copy(text, $("#copyShop"));
+  }
+
+  function nutritionSummaryLines(w) {
+    const wa = avgWeight(weightSeries(), w.end);
+    const rows = w.sessions.map((s) => ({ eat: consumed(s.date), tg: targetsFor(dayState(s.date).type) })).filter((r) => r.eat.k > 0);
+    if (!rows.length) return ["Nutrición: sin registrar", ...(wa ? [`Peso medio de la semana: ${fmtNum(wa.avg, 1)} kg (${wa.n} pesajes)`] : [])];
+    const avg = (f) => rows.reduce((a, r) => a + f(r), 0) / rows.length;
+    const lines = [`Nutrición (${rows.length} días registrados): media ${fmtNum(avg((r) => r.eat.k), 0)} kcal de ${fmtNum(avg((r) => r.tg.kcal), 0)} objetivo · proteína ${fmtNum(avg((r) => r.eat.p), 0)} g · hidratos ${fmtNum(avg((r) => r.eat.c), 0)} g · grasa ${fmtNum(avg((r) => r.eat.f), 0)} g${boost() ? ` · ajuste ${boost() * 250} kcal` : ""}`];
+    if (wa) lines.push(`Peso medio de la semana: ${fmtNum(wa.avg, 1)} kg (${wa.n} pesajes)`);
+    return lines;
+  }
+
   // ——— Datos ———
   function viewDatos() {
     const n = Object.keys(Store.logs).length;
@@ -850,7 +1080,7 @@
     const [, view = "hoy", arg] = location.hash.split("/");
     header(view === "sesion" ? "plan" : view);
     ({ hoy: viewHoy, plan: () => viewPlan(arg), sesion: () => viewSesion(arg), fuerza: () => viewFuerza(arg),
-      progreso: viewProgreso, guia: viewGuia, datos: viewDatos }[view] || viewHoy)();
+      nutricion: () => viewNutricion(arg), progreso: viewProgreso, guia: viewGuia, datos: viewDatos }[view] || viewHoy)();
   }
   window.addEventListener("hashchange", () => { route(); window.scrollTo(0, 0); });
   applyTheme();
