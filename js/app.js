@@ -781,16 +781,17 @@
   // ——— Nutrición ———
   const isoAdd = (iso, n) => addDays(iso, n);
   function sessionOn(date) { return ALL.find((s) => s.date === date) || null; }
-  function autoDayType(date) { const s = sessionOn(date); return s ? INTENSITY_TO_DAY[s.intensity] || "suave" : "suave"; }
+  function autoDayType(date) { return dietTypeFor(sessionOn(date)); }
   function dayState(date) {
     const d = Store.getDay(date) || {};
-    return { type: d.type || autoDayType(date), auto: !d.type, opts: d.opts || {}, done: d.done || {}, extras: d.extras || {},
+    const manual = d.type ? (LEGACY_DAY[d.type] || d.type) : null;
+    return { type: manual && DAY_TYPES[manual] ? manual : autoDayType(date), auto: !manual, opts: d.opts || {}, done: d.done || {}, extras: d.extras || {},
       swaps: d.swaps || {}, added: d.added || {}, weight: d.weight || "", raw: d };
   }
   function saveDay(date, patch) { const cur = Store.getDay(date) || {}; Store.setDay(date, { ...cur, ...patch }); }
   const boost = () => Number(Store.settings.dietBoost || 0);
   function targetsFor(type) {
-    const t = DAY_TYPES[type], b = boost();
+    const t = DAY_TYPES[LEGACY_DAY[type] || type] || DAY_TYPES.suave, b = boost();
     return { kcal: t.kcal + b * 250, p: t.p, c: t.c + b * 40, f: t.f + b * 10 };
   }
   function mealOption(meal, st) { return meal.options.find((o) => o.id === (st.opts[meal.id] || "A")) || meal.options[0]; }
@@ -879,7 +880,8 @@
         <div><div class="eyebrow">${date === todayISO() ? "Hoy · " : ""}${fmtDate(date, true)}</div><h1 class="display">Nutrición</h1></div>
         <div class="daynav"><a class="iconbtn" href="#/nutricion/${isoAdd(date, -1)}" aria-label="Día anterior">‹</a>${date !== todayISO() ? `<a class="iconbtn txt" href="#/nutricion">Hoy</a>` : ""}<a class="iconbtn" href="#/nutricion/${isoAdd(date, 1)}" aria-label="Día siguiente">›</a></div>
       </div>
-      <div class="seg mt" id="dayType">${DAY_ORDER.map((k) => `<button data-v="${k}" class="${st.type === k ? "on" : ""}">${DAY_TYPES[k].short}</button>`).join("")}</div>
+      <div class="catchips daychips" id="dayType">${DAY_ORDER.map((k) => `<button data-v="${k}" class="${st.type === k ? "on" : ""}">${DAY_TYPES[k].short}</button>`).join("")}</div>
+      <p class="daytype-why">${esc(DAY_TYPES[st.type].why)}</p>
       <p class="muted tiny daytype-note">${st.auto ? "Automático según el plan" : "Elegido a mano"}${s ? ` · <a class="link" href="#/sesion/${s.id}">${esc(s.title)}</a>` : ""}${!st.auto ? ` · <a href="#" id="autoType" class="link">volver a automático</a>` : ""}</p></section>
       <section class="card kcalcard">
         <div class="kcal-ring">${ring(pct, 104, 10)}<div><b>${fmtNum(eat.k, 0)}</b><small>de ${fmtNum(tg.kcal, 0)} kcal</small></div></div>
@@ -1156,7 +1158,7 @@
         <div class="scroll-x"><table class="tbl"><thead><tr><th>Día</th><th>kcal</th><th>Prot.</th><th>Hidr.</th><th>Grasa</th></tr></thead><tbody>
         ${DAY_ORDER.map((k) => { const t = targetsFor(k); return `<tr><td><b>${DAY_TYPES[k].name}</b><small class="src">${DAY_TYPES[k].why}</small></td><td>${fmtNum(t.kcal, 0)}</td><td>${t.p} g</td><td>${t.c} g</td><td>${t.f} g</td></tr>`; }).join("")}
         </tbody></table></div>
-        <p class="muted tiny">Media semanal ≈ ${fmtNum((4 * targetsFor("duro").kcal + targetsFor("medio").kcal + 2 * targetsFor("suave").kcal) / 7, 0)} kcal/día. El tipo de día sale solo de la sesión del plan.${boost() ? ` Incluye tu ajuste de ${boost() > 0 ? "+" : ""}${boost() * 250} kcal.` : ""}</p>
+        <p class="muted tiny">Esta semana: media de ${fmtNum(WEEKS[currentWeekNum() - 1].sessions.reduce((a, x) => a + targetsFor(dietTypeFor(x)).kcal, 0) / 7, 0)} kcal/día. El tipo de día sale solo de la sesión del plan.${boost() ? ` Incluye tu ajuste de ${boost() > 0 ? "+" : ""}${boost() * 250} kcal.` : ""}</p>
         ${boost() ? `<button class="btn ghost" id="resetBoost">Quitar ajuste de calorías</button>` : ""}
       </section>
       <section class="card"><h2>Reglas</h2><ul class="bul">${DIET_RULES.map((r) => `<li>${esc(r)}</li>`).join("")}</ul></section>
