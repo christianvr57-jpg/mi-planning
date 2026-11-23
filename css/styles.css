@@ -619,3 +619,19 @@ body.noscroll { overflow: hidden; }
 .split-item .fbadge { margin: 0 0 4px; align-self: flex-start; }
 .split-item b { font-size: .9rem; }
 .split-item small { color: var(--muted); font-size: .74rem; }
+
+/* ============ Hoy: 10K y sesiones dobles ============ */
+.racecard { display: flex; gap: 16px; align-items: center; text-decoration: none; padding: 16px; background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 16%, var(--surface)), var(--surface) 70%); }
+.rc-days { text-align: center; flex: 0 0 auto; min-width: 74px; line-height: 1; }
+.rc-days b { display: block; font-size: 2.4rem; font-weight: 800; letter-spacing: -.04em; background: var(--grad); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.rc-days small { color: var(--muted); font-size: .72rem; font-weight: 700; }
+.rc-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.rc-row { display: flex; justify-content: space-between; gap: 8px; font-size: .86rem; color: var(--text-2); }
+.rc-row b { color: var(--text); }
+.rc-row b small { color: var(--muted); font-weight: 600; }
+.rc-next { font-size: .78rem; color: var(--muted); margin-top: 2px; }
+.rc-next b { color: var(--accent); }
+.slot { margin-top: 8px; }
+.slot + .slot { padding-top: 6px; border-top: 1px dashed var(--border); }
+.slot-h { font-size: .72rem; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin: 4px 0 -2px; }
+.slot .steps { margin: 4px 0 6px; }

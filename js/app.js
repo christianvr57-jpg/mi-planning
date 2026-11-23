@@ -35,7 +35,7 @@
   const num = (v) => { const n = parseFloat(String(v ?? "").replace(",", ".")); return isNaN(n) ? null : n; };
   const fmtNum = (n, d = 1) => (n == null ? "—" : n.toLocaleString("es-ES", { maximumFractionDigits: d }));
 
-  const KIND = { run: "Carrera", strength: "Fuerza", hybrid: "Doble", test: "Test", sim: "Simulacro", rest: "Descanso", race: "Carrera 10K" };
+  const KIND = { run: "Carrera", strength: "Fuerza", hybrid: "Doble", test: "Test", rest: "Descanso", race: "Carrera 10K" };
   const INT = { suave: "Suave", media: "Media", dura: "Dura", muy: "Muy dura", carrera: "Máxima", libre: "Libre" };
   const INT_LVL = { libre: 0, suave: 1, media: 2, dura: 3, muy: 4, carrera: 5 };
   const STATUS = { done: "Hecha", partial: "Parcial", skipped: "No hecha" };
@@ -87,7 +87,7 @@
 
   function weekStats(w) {
     const train = w.sessions.filter((s) => s.kind !== "rest");
-    let done = 0, partial = 0, skipped = 0, km = 0, min = 0, rpeSum = 0, rpeN = 0;
+    let done = 0, partial = 0, skipped = 0, km = 0, min = 0, rpeSum = 0, rpeN = 0, sets = 0, vol = 0;
     const fat = { verde: 0, amarillo: 0, rojo: 0 };
     w.sessions.forEach((s) => {
       const l = Store.getLog(s.id);
@@ -99,8 +99,9 @@
       min += num(l.minutes) || 0;
       if (num(l.rpe)) { rpeSum += num(l.rpe); rpeN++; }
       if (fat[l.fatigue] != null) fat[l.fatigue]++;
+      Object.values(l.sets || {}).forEach((ss) => ss.forEach((x) => { sets++; vol += (x.kg || 0) * (x.reps || 0); }));
     });
-    return { planned: train.length, done, partial, skipped, km, min, rpe: rpeN ? rpeSum / rpeN : null, fat };
+    return { planned: train.length, done, partial, skipped, km, min, rpe: rpeN ? rpeSum / rpeN : null, fat, sets, vol };
   }
   function overall() {
     const train = ALL.filter((s) => s.kind !== "rest");
@@ -160,6 +161,27 @@
     </a>`;
   }
 
+  // Pasos: si la sesión es doble, se agrupan en Mañana y Tarde
+  function stepsHtml(steps) {
+    if (!steps.some((x) => /^(Mañana|Tarde):/.test(x))) return `<ol class="steps">${steps.map((x) => `<li>${richText(x)}</li>`).join("")}</ol>`;
+    const groups = [];
+    steps.forEach((x) => {
+      const m = x.match(/^(Mañana|Tarde):\s*(.*)$/);
+      if (m || !groups.length) groups.push({ t: m ? m[1] : "", items: [] });
+      groups[groups.length - 1].items.push(m ? m[2] : x);
+    });
+    return groups.map((g) => `<div class="slot">${g.t ? `<div class="slot-h">${g.t === "Mañana" ? "☀️" : "🌙"} ${g.t}</div>` : ""}<ol class="steps">${g.items.filter(Boolean).map((x) => `<li>${richText(x)}</li>`).join("")}</ol></div>`).join("");
+  }
+  // Predicción del 10K (Riegel) con el último test registrado
+  function runPrediction() {
+    const tests = ALL.filter((x) => ["test5k", "test10k", "race10k"].includes(x.metrics)).map((x) => {
+      const key = { test5k: "t5k", test10k: "t10k", race10k: "race10k" }[x.metrics];
+      return { s: x, dist: x.metrics === "test5k" ? 5 : 10, v: Store.getLog(x.id)?.metrics?.[key] };
+    }).filter((t) => t.v && toSec(t.v));
+    const last = tests[tests.length - 1];
+    return { pred: last ? toSec(last.v) * Math.pow(10 / last.dist, 1.06) : toSec("20:00") * Math.pow(2, 1.06), last };
+  }
+
   function heroSession(s, label) {
     const w = WEEKS[s.week - 1];
     const log = Store.getLog(s.id);
@@ -174,7 +196,7 @@
         ${s.kind !== "rest" ? `<span>${meter(s.intensity)} ${INT[s.intensity]}</span>` : ""}
         <span class="ph ${PHASES[w.phase].color}"><i></i>S${s.week} · ${PHASES[w.phase].name}</span>
       </div>
-      <ol class="steps">${s.steps.map((x) => `<li>${richText(x)}</li>`).join("")}</ol>
+      ${stepsHtml(s.steps)}
       ${label.startsWith("Hoy") || label.startsWith("Primera") || label.startsWith("Última") ? s.strength.map((k) => strengthBlock(k, s.week, s.id, false)).join("") : ""}
       ${label.startsWith("Hoy") || label.startsWith("Primera") || label.startsWith("Última") ? `<a class="btn primary block" href="#/sesion/${s.id}">${log ? `${ico("check")} ${STATUS[log.status]} · ver registro` : "Registrar sesión"}</a>` : ""}
     </section>`;
@@ -196,6 +218,17 @@
         <div class="greet-right"><b>Día ${dayN}</b><small>de ${ALL.length}</small></div>
       </section>
       ${heroSession(s, before ? "Primera sesión · " + fmtDate(s.date, true) : s.date === t ? "Hoy" : "Última sesión · " + fmtDate(s.date, true))}
+      ${(() => {
+        const tg = target(), dl = daysBetween(t, RACE_DATE), rp = runPrediction();
+        const nextTest = ALL.find((x) => x.metrics && x.date >= t);
+        if (dl < 0) return "";
+        return `<a class="card racecard" href="#/progreso">
+          <div class="rc-days"><b>${dl}</b><small>${dl === 1 ? "día" : "días"} al 10K</small></div>
+          <div class="rc-body">
+            <div class="rc-row"><span>Objetivo ${tg}</span><b>${ATHLETE.targets[tg].total} <small>${ATHLETE.targets[tg].pace}</small></b></div>
+            <div class="rc-row"><span>Predicción</span><b>${fmtSec(rp.pred)}</b></div>
+            ${nextTest ? `<div class="rc-next">${nextTest.date === t ? "Hoy" : "Próximo"}: <b>${esc(nextTest.title.replace(/ \+ .*/, ""))}</b> · ${nextTest.date === t ? "¡a por ello!" : `${fmtDate(nextTest.date, true)} (en ${daysBetween(t, nextTest.date)} d)`}</div>` : ""}
+          </div></a>`; })()}
       ${(() => { const nst = dayState(t), ntg = targetsFor(nst.type), ne = consumed(t), np = Math.min(100, Math.round((ne.k / ntg.kcal) * 100));
         return `<a class="card nutmini" href="#/nutricion"><div class="nm-ring">${ring(np, 52, 6)}<span>${np}%</span></div>
           <div class="nm-body"><div class="eyebrow">Comida · ${DAY_TYPES[nst.type].name}</div><b>${fmtNum(ne.k, 0)} / ${fmtNum(ntg.kcal, 0)} kcal</b><small>Proteína ${Math.round(ne.p)}/${ntg.p} g${nst.weight ? ` · ${esc(nst.weight)} kg` : " · pésate en ayunas"}</small></div>${ico("chev")}</a>`; })()}
@@ -203,11 +236,13 @@
         <div class="row-between"><div><div class="eyebrow">Semana ${w.week}</div><h2>${esc(w.title)}</h2></div><a class="link" href="#/plan/${w.week}">Ver semana ${ico("chev")}</a></div>
         <div class="weekstrip">${w.sessions.map((x) => `<a href="#/sesion/${x.id}" class="int-${x.intensity} ${x.id === s.id ? "on" : ""} st-${statusKey(x)}">
           <small>${x.day.split(" ")[0]}</small><b>${x.day.split(" ")[1]}</b><span class="ws-ico k-${x.kind}">${ico(x.kind)}</span>${statusDot(x)}</a>`).join("")}</div>
-        <div class="kpis three">
+        <div class="kpis">
           <div><span>Sesiones</span><b>${st.done + st.partial}<small>/${st.planned}</small></b></div>
           <div><span>Km carrera</span><b>${fmtNum(st.km)}<small>/${w.km}</small></b></div>
+          <div><span>Series de fuerza</span><b>${st.sets || "—"}</b></div>
           <div><span>RPE medio</span><b>${st.rpe ? fmtNum(st.rpe) : "—"}</b></div>
         </div>
+        <p class="muted tiny">${esc(w.focus)} · Sesión clave: ${esc(w.key)}</p>
       </section>
       ${pend.length ? `<section class="card warn"><div class="eyebrow">Pendiente</div><h2>Sin registrar</h2><p class="muted">Si no las hiciste, márcalas como «No hecha» para que el resumen sea fiel.</p>
         <div class="list">${pend.map((x) => sessionCard(x)).join("")}</div></section>` : ""}
@@ -241,7 +276,7 @@
         <div class="kpis">
           <div><span>Sesiones</span><b>${st.done + st.partial}<small>/${st.planned}</small></b></div>
           <div><span>Km carrera</span><b>${fmtNum(st.km)}<small>/${w.km}</small></b></div>
-          <div><span>Horas</span><b>${st.min ? fmtNum(st.min / 60) : "—"}</b></div>
+          <div><span>Series fuerza</span><b>${st.sets || "—"}<small>${st.vol ? ` · ${fmtNum(st.vol / 1000, 1)} t` : ""}</small></b></div>
           <div><span>RPE medio</span><b>${st.rpe ? fmtNum(st.rpe) : "—"}</b></div>
         </div>
         <dl class="facts"><div><dt>Sesión clave</dt><dd>${esc(w.key)}</dd></div><div><dt>Domingo</dt><dd>${esc(w.sunday)}</dd></div>
@@ -267,6 +302,7 @@
     lines.push(`Ritmo objetivo activo: ${target()} (${ATHLETE.targets[target()].pace})`);
     lines.push(`Sesiones: ${st.done} hechas, ${st.partial} parciales, ${st.skipped} no hechas de ${st.planned} · Km carrera: ${fmtNum(st.km)} / ~${w.km} · Tiempo: ${Math.round(st.min)}' · RPE medio: ${st.rpe ? fmtNum(st.rpe) : "—"}`);
     lines.push(`Semáforo: verde ${st.fat.verde}, amarillo ${st.fat.amarillo}, rojo ${st.fat.rojo}`);
+    lines.push(`Fuerza: ${st.sets} series registradas · volumen ${fmtNum(st.vol, 0)} kg`);
     nutritionSummaryLines(w).forEach((x) => lines.push(x));
     lines.push("");
     w.sessions.forEach((s) => {
@@ -474,6 +510,7 @@
     const idx = ALL.indexOf(s);
     const prev = ALL[idx - 1], next = ALL[idx + 1];
     const metrics = s.metrics ? METRIC_SETS[s.metrics] : [];
+    const hasRun = ["run", "hybrid", "test", "race"].includes(s.kind);
     const seg = (name, opts, val) => `<div class="seg" data-name="${name}">${opts.map(([v, l]) => `<button type="button" data-v="${v}" class="${val === v ? "on" : ""} ${name === "fatigue" ? "f-" + v : ""}">${l}</button>`).join("")}</div>`;
     app.innerHTML = `
       <div class="pager top">${prev ? `<a class="btn ghost" href="#/sesion/${prev.id}">← ${prev.day}</a>` : "<span></span>"}<a class="btn ghost" href="#/plan/${s.week}">Semana ${s.week}</a>${next ? `<a class="btn ghost" href="#/sesion/${next.id}">${next.day} →</a>` : "<span></span>"}</div>
@@ -490,16 +527,16 @@
         <div class="rpe-scale"><span>1 · muy fácil</span><span>5 · moderado</span><span>10 · máximo</span></div>
         <div class="grid2">
           <div><label for="minutes">Duración (min)</label><input id="minutes" name="minutes" inputmode="decimal" value="${esc(log.minutes || "")}" placeholder="${parseInt(s.duration) || ""}"></div>
-          <div><label for="km">Km de carrera</label><input id="km" name="km" inputmode="decimal" value="${esc(log.km || "")}" placeholder="0"></div>
+          ${hasRun ? `<div><label for="km">Km de carrera</label><input id="km" name="km" inputmode="decimal" value="${esc(log.km || "")}" placeholder="0"></div>` : ""}
           <div><label for="hr">FC media (ppm)</label><input id="hr" name="hr" inputmode="numeric" value="${esc(log.hr || "")}"></div>
-          <div><label for="hrmax">FC máx (ppm)</label><input id="hrmax" name="hrmax" inputmode="numeric" value="${esc(log.hrmax || "")}"></div>
-          <div><label for="pace">Ritmo medio (min/km)</label><input id="pace" name="pace" value="${esc(log.pace || "")}" placeholder="4:30"></div>
+          ${hasRun ? `<div><label for="hrmax">FC máx (ppm)</label><input id="hrmax" name="hrmax" inputmode="numeric" value="${esc(log.hrmax || "")}"></div>
+          <div><label for="pace">Ritmo medio (min/km)</label><input id="pace" name="pace" value="${esc(log.pace || "")}" placeholder="4:30"></div>` : ""}
           <div><label for="weight">Peso (kg, en ayunas)</label><input id="weight" name="weight" inputmode="decimal" value="${esc(log.weight || "")}" placeholder="81"></div>
         </div>
         ${metrics.length ? `<div class="metricbox"><h3>Resultados</h3><div class="grid2">${metrics.map((m) =>
           `<div><label for="m_${m.key}">${esc(m.label)} <small>(${m.unit})</small></label><input id="m_${m.key}" data-metric="${m.key}" value="${esc(log.metrics?.[m.key] || "")}" placeholder="${esc(m.hint)}"></div>`).join("")}</div></div>` : ""}
-        <label for="splits">Parciales / series (opcional)</label>
-        <textarea id="splits" name="splits" rows="2" placeholder="p. ej. 3:07, 3:06, 3:08, 3:05, 3:04">${esc(log.splits || "")}</textarea>
+        ${hasRun ? `<label for="splits">Parciales de carrera (opcional)</label>
+        <textarea id="splits" name="splits" rows="2" placeholder="p. ej. 3:50, 3:49, 3:51, 3:48, 3:47">${esc(log.splits || "")}</textarea>` : ""}
         <label for="notes">Notas</label>
         <textarea id="notes" name="notes" rows="3" placeholder="Sensaciones, molestias, cambios…">${esc(log.notes || "")}</textarea>
         <div class="actions">
@@ -528,7 +565,7 @@
       if (!status) { toast("Elige el estado de la sesión"); return; }
       const data = { week: s.week, date: s.date, title: s.title, status, fatigue: segv("fatigue"),
         rpe: rpe.dataset.touched === "1" ? Number(rpe.value) : "", metrics: {}, loads: {} };
-      ["minutes", "km", "hr", "hrmax", "pace", "weight", "splits", "notes"].forEach((k) => (data[k] = form.elements[k].value.trim()));
+      ["minutes", "km", "hr", "hrmax", "pace", "weight", "splits", "notes"].forEach((k) => (data[k] = form.elements[k] ? form.elements[k].value.trim() : log[k] || ""));
       form.querySelectorAll("[data-metric]").forEach((i) => { if (i.value.trim()) data.metrics[i.dataset.metric] = i.value.trim(); });
       data.sets = {};
       form.querySelectorAll(".exlog").forEach((ex) => {
@@ -537,12 +574,6 @@
         if (sets.length) { data.sets[name] = sets; data.loads[name] = setsSummary(sets); }
         else if (log.loads?.[name] && !log.sets?.[name]) data.loads[name] = log.loads[name]; // conserva anotaciones antiguas
       });
-      // Test de 5RM: rellena el resultado con la serie más pesada de 5+ reps si no lo has escrito
-      const top5 = (ex) => { const ss = data.sets[ex] || []; const ok = ss.filter((x) => (x.reps || 0) >= 5 && x.kg); return ok.length ? Math.max(...ok.map((x) => x.kg)) : null; };
-      if (s.metrics === "test5rm") {
-        if (!data.metrics.sq5rm && top5("Sentadilla trasera")) data.metrics.sq5rm = String(top5("Sentadilla trasera"));
-        if (!data.metrics.dl5rm && top5("Peso muerto convencional")) data.metrics.dl5rm = String(top5("Peso muerto convencional"));
-      }
       Store.setLog(id, data);
       toast("Sesión guardada ✓");
       route();
@@ -654,7 +685,7 @@
       <section class="card"><h2>Km de carrera por semana</h2>
         <div class="legend"><span><i class="sw sw-plan"></i>Planificado</span><span><i class="sw sw-real"></i>Registrado</span></div>
         ${kmChart()}</section>
-      <section class="card"><h2>Carga semanal</h2><p class="muted">Sesiones hechas, km, horas, RPE medio y semáforo.</p>${loadTable()}</section>
+      <section class="card"><h2>Carga semanal</h2><p class="muted">Sesiones hechas, km de carrera, series de fuerza, horas, RPE medio y semáforo.</p>${loadTable()}</section>
       <section class="card"><h2>Peso corporal</h2><p class="muted">Fase de volumen: objetivo +0,4 a +0,7 kg por semana (media de 7 días).</p>${weightChart()}</section>
       ${runSection()}
     `;
@@ -682,9 +713,9 @@
 
   function loadTable() {
     const ws = WEEKS.filter((w) => w.start <= todayISO());
-    return `<div class="scroll-x"><table class="tbl"><thead><tr><th>Sem</th><th>Hechas</th><th>Km</th><th>Horas</th><th>RPE</th><th>Semáforo</th></tr></thead><tbody>
+    return `<div class="scroll-x"><table class="tbl"><thead><tr><th>Sem</th><th>Hechas</th><th>Km</th><th>Series</th><th>Horas</th><th>RPE</th><th>Semáforo</th></tr></thead><tbody>
       ${ws.map((w) => { const s = weekStats(w);
-        return `<tr><td><a href="#/plan/${w.week}">S${w.week}</a></td><td>${s.done + s.partial}/${s.planned}</td><td>${fmtNum(s.km)} <small class="muted">/ ${w.km}</small></td><td>${fmtNum(s.min / 60)}</td>
+        return `<tr><td><a href="#/plan/${w.week}">S${w.week}</a></td><td>${s.done + s.partial}/${s.planned}</td><td>${fmtNum(s.km)} <small class="muted">/ ${w.km}</small></td><td>${s.sets || "—"}</td><td>${fmtNum(s.min / 60)}</td>
         <td>${s.rpe ? `<span class="rpebar"><i style="width:${s.rpe * 10}%"></i></span> ${fmtNum(s.rpe)}` : "—"}</td>
         <td>${s.fat.verde ? `<span class="fd f-verde">${s.fat.verde}</span>` : ""}${s.fat.amarillo ? `<span class="fd f-amarillo">${s.fat.amarillo}</span>` : ""}${s.fat.rojo ? `<span class="fd f-rojo">${s.fat.rojo}</span>` : ""}</td></tr>`; }).join("")}
     </tbody></table></div>`;
@@ -721,8 +752,7 @@
     ].map((t) => ({ ...t, v: Store.getLog(t.s.id)?.metrics?.[t.key] || null }));
     const done = tests.filter((t) => t.v && toSec(t.v));
     const last = done[done.length - 1];
-    // Predicción de Riegel (exponente 1,06) desde el último test
-    const pred = last ? toSec(last.v) * Math.pow(10 / last.dist, 1.06) : toSec("20:00") * Math.pow(2, 1.06);
+    const pred = runPrediction().pred; // Riegel (exponente 1,06) desde el último test
     const goal = toSec(ATHLETE.targets[tg].total);
     const gap = pred - goal;
     return `<section class="card"><div class="row-between"><h2>Carrera 10K</h2>
