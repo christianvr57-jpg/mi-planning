@@ -35,7 +35,7 @@
   const num = (v) => { const n = parseFloat(String(v ?? "").replace(",", ".")); return isNaN(n) ? null : n; };
   const fmtNum = (n, d = 1) => (n == null ? "—" : n.toLocaleString("es-ES", { maximumFractionDigits: d }));
 
-  const KIND = { run: "Carrera", strength: "Fuerza", hybrid: "Híbrido", test: "Test", sim: "Simulacro", rest: "Descanso", race: "Prueba final" };
+  const KIND = { run: "Carrera", strength: "Fuerza", hybrid: "Doble", test: "Test", sim: "Simulacro", rest: "Descanso", race: "Carrera 10K" };
   const INT = { suave: "Suave", media: "Media", dura: "Dura", muy: "Muy dura", carrera: "Máxima", libre: "Libre" };
   const INT_LVL = { libre: 0, suave: 1, media: 2, dura: 3, muy: 4, carrera: 5 };
   const STATUS = { done: "Hecha", partial: "Parcial", skipped: "No hecha" };
@@ -59,7 +59,7 @@
   function currentWeekNum() {
     const idx = daysBetween(PLAN_START, todayISO());
     if (idx < 0) return 1;
-    return Math.min(13, Math.floor(idx / 7) + 1);
+    return Math.min(WEEKS.length, Math.floor(idx / 7) + 1);
   }
   function todaySession() {
     const t = todayISO();
@@ -71,7 +71,7 @@
     let h = esc(t);
     h = h.replace(/\b(Z[1-5](?:–Z[1-5])?)\b/g, (m) => `<span class="zchip z-${m.slice(0, 2).toLowerCase()}">${m}</span>`);
     h = h.replace(/\bRO\b/g, `<span class="zchip z-ro">RO</span>`);
-    h = h.replace(/\bFuerza ([ABC])\b/g, `<a class="fchip" href="#/fuerza/$1">Fuerza $1</a>`);
+    STRENGTH_ORDER.forEach((k) => { const l = STRENGTH[k].label; h = h.replace(new RegExp(`\\b${l}\\b`, "g"), `<a class="fchip" href="#/fuerza/${k}">${l}</a>`); });
     h = h.replace(/^(C|VC)(\s|$|\s\()/, `<abbr title="${t.startsWith("VC") ? "Vuelta a la calma" : "Calentamiento"}">$1</abbr>$2`);
     return h;
   }
@@ -125,7 +125,7 @@
       ["guia", "Guía", "M4 19.5A2.5 2.5 0 0 1 6.5 17H20V3H6.5A2.5 2.5 0 0 0 4 5.5zM4 19.5A2.5 2.5 0 0 0 6.5 22H20v-5"]];
     $("#topbar").innerHTML = `
       <a class="brand" href="#/hoy"><span class="logo"><svg viewBox="0 0 24 24"><path d="M2 13h4l3-8 4 14 3-9 2 3h4"/></svg></span>
-        <span><b>Mi planning</b><small>Semana ${wn} de 13 · ${PHASES[w.phase].name}</small></span></a>
+        <span><b>Mi planning</b><small>Semana ${wn} de ${WEEKS.length} · ${PHASES[w.phase].name}</small></span></a>
       <a class="ringbtn" href="#/progreso" title="Plan completado: ${o.done} de ${o.total} sesiones">${ring(o.pct)}<span>${o.pct}%</span></a>
       <a class="iconbtn" href="#/datos" aria-label="Datos y copia de seguridad"><svg viewBox="0 0 24 24"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/></svg></a>`;
     $("#tabbar").innerHTML = tabs.map(([k, l, d]) =>
@@ -135,7 +135,7 @@
   function phaseTimeline(sel) {
     const cw = currentWeekNum();
     const used = [...new Set(WEEKS.map((w) => w.phase))];
-    return `<div class="timeline">${WEEKS.map((w) => {
+    return `<div class="timeline" style="grid-template-columns:repeat(${WEEKS.length},1fr)">${WEEKS.map((w) => {
       const st = weekStats(w);
       const pct = st.planned ? ((st.done + st.partial) / st.planned) * 100 : 0;
       return `<a href="#/plan/${w.week}" class="tl ${PHASES[w.phase].color} ${w.week === cw ? "now" : ""} ${w.week === sel ? "sel" : ""}" title="S${w.week} · ${esc(w.title)}">
@@ -212,7 +212,7 @@
       ${pend.length ? `<section class="card warn"><div class="eyebrow">Pendiente</div><h2>Sin registrar</h2><p class="muted">Si no las hiciste, márcalas como «No hecha» para que el resumen sea fiel.</p>
         <div class="list">${pend.map((x) => sessionCard(x)).join("")}</div></section>` : ""}
       ${tomorrow ? `<section><div class="section-title">Mañana</div><div class="list">${sessionCard(tomorrow, { preview: true })}</div></section>` : ""}
-      <section class="card"><div class="eyebrow">13 semanas</div><h2>Tu temporada</h2>${phaseTimeline()}</section>
+      <section class="card"><div class="eyebrow">${WEEKS.length} semanas</div><h2>Tu temporada</h2>${phaseTimeline()}</section>
       ${trafficLight()}
     `;
   }
@@ -226,7 +226,7 @@
 
   // ——— Plan ———
   function viewPlan(n) {
-    const wn = Math.max(1, Math.min(13, Number(n) || currentWeekNum()));
+    const wn = Math.max(1, Math.min(WEEKS.length, Number(n) || currentWeekNum()));
     const w = WEEKS[wn - 1];
     const st = weekStats(w);
     const pct = st.planned ? Math.round(((st.done + st.partial * 0.5) / st.planned) * 100) : 0;
@@ -255,7 +255,7 @@
         <button class="btn primary block" id="copySum">${ico("copy")} Copiar resumen de la semana ${w.week}</button>
         <details class="mt"><summary>Ver texto</summary><pre class="pre" id="sumText">${esc(weekSummary(w))}</pre></details>
       </section>
-      <div class="pager">${wn > 1 ? `<a class="btn" href="#/plan/${wn - 1}">← Semana ${wn - 1}</a>` : "<span></span>"}${wn < 13 ? `<a class="btn" href="#/plan/${wn + 1}">Semana ${wn + 1} →</a>` : ""}</div>
+      <div class="pager">${wn > 1 ? `<a class="btn" href="#/plan/${wn - 1}">← Semana ${wn - 1}</a>` : "<span></span>"}${wn < WEEKS.length ? `<a class="btn" href="#/plan/${wn + 1}">Semana ${wn + 1} →</a>` : ""}</div>
     `;
     $("#copySum").onclick = () => copy(weekSummary(w), $("#copySum"));
   }
@@ -337,7 +337,7 @@
     const top = Math.max(...prev.sets.map((x) => x.kg || 0));
     if (!top) return null;
     const allDone = scheme && prev.sets.length >= scheme.sets && (!scheme.reps || prev.sets.every((x) => (x.reps || 0) >= scheme.reps));
-    return { kg: allDone ? top + (k === "A" ? 5 : 2.5) : top, up: allDone };
+    return { kg: allDone ? top + (STRENGTH[k]?.legs ? 5 : 2.5) : top, up: allDone };
   }
 
   function strengthBlock(k, week, sessionId, editable) {
@@ -345,9 +345,8 @@
     const ci = t.weekCol[week];
     const s = byId[sessionId];
     const log = sessionId ? Store.getLog(sessionId) : null;
-    const head = `<div class="row-between"><h3><span class="fbadge">${k}</span>${esc(cap(t.name.split(" — ")[1] || t.name))}</h3><span class="pill">${t.cols[ci]}</span></div>
-      ${week === 13 && k === "B" ? `<p class="muted tiny">Semana final: solo press banca, dominadas y remo, 2 × 5 a RIR 3.</p>` : ""}
-      ${(week === 6 || week === 10) && k === "C" ? `<p class="muted tiny">Reducida: solo torso, 2 series por ejercicio y sin farmers.</p>` : ""}`;
+    const head = `<div class="row-between"><h3><span class="fbadge">${k}</span>${esc(t.label)}</h3><span class="pill">${t.cols[ci]}</span></div>
+      ${t.note ? `<p class="muted tiny">${esc(t.note)}</p>` : ""}`;
     if (!editable) {
       return `<div class="strength">${head}<div class="exlist">${t.rows.map((r) =>
         `<div class="ex"><div class="ex-name">${esc(r.ex)}</div><div class="ex-sets">${esc(r.values[ci])}</div></div>`).join("")}</div></div>`;
@@ -555,15 +554,15 @@
   // ——— Fuerza ———
   function viewFuerza(k) {
     const wn = currentWeekNum();
-    const keys = ["B", "A", "C"];
+    const keys = STRENGTH_ORDER;
     const sel = keys.includes(k) ? k : null;
     app.innerHTML = `
-      <section class="pagehead"><div class="eyebrow">3 sesiones por semana</div><h1 class="display">Fuerza</h1>
-      <p class="muted">B lunes (torso) · A martes (pierna) · C viernes (torso y agarre). Resaltada, la columna de la semana ${wn}.</p>
-      <div class="seg nav">${keys.map((x) => `<a href="#/fuerza/${x}" class="${sel === x ? "on" : ""}">Fuerza ${x}</a>`).join("")}<a href="#/fuerza" class="${!sel ? "on" : ""}">Todas</a></div></section>
+      <section class="pagehead"><div class="eyebrow">Hipertrofia · ${keys.length} sesiones por semana</div><h1 class="display">Fuerza</h1>
+      <p class="muted">${keys.map((x) => `${STRENGTH[x].label} (${STRENGTH[x].day.toLowerCase()})`).join(" · ")}. Resaltada, la columna de la semana ${wn}.</p>
+      <div class="catchips">${keys.map((x) => `<a href="#/fuerza/${x}" class="chiplink ${sel === x ? "on" : ""}">${STRENGTH[x].label}</a>`).join("")}<a href="#/fuerza" class="chiplink ${!sel ? "on" : ""}">Todas</a></div></section>
       ${(sel ? [sel] : keys).map((x) => {
         const t = STRENGTH[x]; const ci = t.weekCol[wn];
-        return `<section class="card"><div class="row-between"><h2><span class="fbadge">${x}</span>${esc(cap(t.name.split(" — ")[1]))}</h2><span class="pill">${t.day}</span></div>
+        return `<section class="card"><div class="row-between"><h2><span class="fbadge">${x}</span>${esc(t.label)}</h2><span class="pill">${t.day}</span></div>
         ${t.note ? `<p class="muted">${esc(t.note)}</p>` : ""}
         <div class="exlist">${t.rows.map((r) => `<div class="ex"><div class="ex-name">${esc(r.ex)}</div><div class="ex-sets now">${esc(r.values[ci])}</div></div>`).join("")}</div>
         <details class="mt"><summary>Progresión completa</summary>
@@ -572,7 +571,7 @@
         ${loadHistory(x)}</section>`;
       }).join("")}
       <section class="card"><h2>Cómo cargar</h2><ul class="bul">${STRENGTH_RULES.map((r) => `<li>${esc(r)}</li>`).join("")}</ul></section>
-      ${oneRM()}
+      ${bestLifts()}
     `;
   }
 
@@ -615,14 +614,20 @@
     return val ? { val, s: when } : null;
   }
 
-  function oneRM() {
-    const sq = num(metricValue("sq5rm")?.val), dl = num(metricValue("dl5rm")?.val);
-    if (!sq && !dl) return `<section class="card"><h2>1RM estimado</h2><p class="muted">Registra el test de 5RM (martes de la semana 1) para ver aquí tus cargas de trabajo.</p></section>`;
-    const pc = [["4×6", 0.75], ["4×5", 0.8], ["4×4", 0.82], ["3×3", 0.85]];
-    const row = (name, r) => { const rm = r / 0.87; return `<tr><td>${name}</td><td>${fmtNum(r)}</td><td><b>${fmtNum(rm, 0)}</b></td>${pc.map(([, p]) => `<td>${Math.round((rm * p) / 2.5) * 2.5}</td>`).join("")}</tr>`; };
-    return `<section class="card"><h2>1RM estimado y cargas</h2><p class="muted">1RM = 5RM ÷ 0,87. Cargas redondeadas a 2,5 kg.</p>
-      <div class="scroll-x"><table class="tbl"><thead><tr><th></th><th>5RM</th><th>1RM</th>${pc.map(([l, p]) => `<th>${l}<small> ${p * 100}%</small></th>`).join("")}</tr></thead><tbody>
-      ${sq ? row("Sentadilla", sq) : ""}${dl ? row("Peso muerto", dl) : ""}</tbody></table></div></section>`;
+  // Mejores marcas estimadas (1RM por Epley) a partir de las series registradas
+  function bestLifts() {
+    const lifts = ["Press banca con barra", "Sentadilla trasera", "Peso muerto convencional", "Dominadas (lastre si haces más de 8)", "Press militar con mancuernas", "Hip thrust"];
+    const rows = lifts.map((ex) => {
+      let best = null;
+      ALL.forEach((s) => { (Store.getLog(s.id)?.sets?.[ex] || []).forEach((x) => { const v = e1rm(x.kg, x.reps); if (v && (!best || v > best.v)) best = { v, x, s }; }); });
+      return { ex, best };
+    }).filter((r) => r.best);
+    if (!rows.length) return `<section class="card"><h2>Marcas estimadas</h2><p class="muted">Cuando registres series de los básicos, aquí verás tu 1RM estimado y las cargas para cada rango.</p></section>`;
+    const pc = [["10 reps", 0.75], ["8 reps", 0.8], ["6 reps", 0.85], ["5 reps", 0.87]];
+    return `<section class="card"><h2>Marcas estimadas</h2><p class="muted">1RM estimado con tu mejor serie (fórmula de Epley) y la carga orientativa para cada rango a RIR 1–2.</p>
+      <div class="scroll-x"><table class="tbl"><thead><tr><th>Ejercicio</th><th>Mejor serie</th><th>1RM</th>${pc.map(([l]) => `<th>${l}</th>`).join("")}</tr></thead><tbody>
+      ${rows.map(({ ex, best }) => `<tr><td>${esc(ex.replace(" (lastre si haces más de 8)", " (lastre)"))}</td><td class="nowrap"><a href="#/sesion/${best.s.id}">${kgStr(best.x.kg)}×${best.x.reps}</a></td><td><b>${fmtNum(best.v, 0)}</b></td>${pc.map(([, p]) => `<td>${Math.round((best.v * p) / 2.5) * 2.5}</td>`).join("")}</tr>`).join("")}
+      </tbody></table></div></section>`;
   }
 
   // ——— Progreso ———
@@ -636,7 +641,7 @@
     const kmPlan = WEEKS.reduce((a, w) => a + w.km, 0);
     const o = overall();
     app.innerHTML = `
-      <section class="pagehead"><div class="eyebrow">Semana ${currentWeekNum()} de 13</div><h1 class="display">Progreso</h1></section>
+      <section class="pagehead"><div class="eyebrow">Semana ${currentWeekNum()} de ${WEEKS.length}</div><h1 class="display">Progreso</h1></section>
       <section class="card statgrid">
         <div class="bigring">${ring(o.pct, 112, 10)}<div><b>${o.pct}%</b><small>del plan</small></div></div>
         <div class="kpis two">
@@ -651,8 +656,7 @@
         ${kmChart()}</section>
       <section class="card"><h2>Carga semanal</h2><p class="muted">Sesiones hechas, km, horas, RPE medio y semáforo.</p>${loadTable()}</section>
       <section class="card"><h2>Peso corporal</h2><p class="muted">Fase de volumen: objetivo +0,4 a +0,7 kg por semana (media de 7 días).</p>${weightChart()}</section>
-      ${stationTable()}
-      ${testsTable()}
+      ${runSection()}
     `;
     bindTips();
   }
@@ -700,65 +704,55 @@
     return `<div class="legend"><span><i class="sw sw-plan"></i>Pesaje</span><span><i class="sw sw-real"></i>Media 7 días</span></div>
     <div class="chart"><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Evolución del peso">
       ${[lo, ATHLETE.weightRef, hi].map((v) => `<line class="grid ${v === ATHLETE.weightRef ? "ref" : ""}" x1="${pl}" x2="${W - pr}" y1="${y(v)}" y2="${y(v)}"/><text class="axis" x="${pl - 6}" y="${y(v) + 4}" text-anchor="end">${v}</text>`).join("")}
-      ${[1, 5, 9, 13].map((wk) => `<text class="axis" x="${x(WEEKS[wk - 1].start)}" y="${H - 6}" text-anchor="middle">S${wk}</text>`).join("")}
+      ${[1, 5, 9, 13, WEEKS.length].filter((v, i, a) => v <= WEEKS.length && a.indexOf(v) === i).map((wk) => `<text class="axis" x="${x(WEEKS[wk - 1].start)}" y="${H - 6}" text-anchor="middle">S${wk}</text>`).join("")}
       ${pts.map((p) => `<circle class="pt-raw" cx="${x(p.date)}" cy="${y(p.v)}" r="3"/>`).join("")}
       <path class="l-real" d="${path}"/>
       ${pts.map((p, i) => `<g class="hit" data-tip="${fmtDate(p.date)}: ${fmtNum(p.v)} kg · media ${fmtNum(avg[i].v, 1)}"><circle cx="${x(p.date)}" cy="${y(p.v)}" r="10" fill="transparent"/></g>`).join("")}
     </svg></div>`;
   }
 
-  function stationTable() {
+  // Carrera: tests, predicción del 10K y objetivo
+  function runSection() {
     const tg = target();
-    const fromTests = { s_push: "push50", s_pull: "pull50", s_farm: "farm200", s_lunge: "lunge100", s_wb: "wb100" };
-    const rows = STATIONS.map((st) => {
-      let v = metricValue(st.key), src = v ? "simulacro" : "";
-      if (!v && st.key === "s_ski") { v = metricValue("ski1000r") || metricValue("ski1000"); src = "test"; }
-      if (!v && st.key === "s_row") { v = metricValue("row1000r") || metricValue("row1000"); src = "test"; }
-      if (!v && st.key === "s_bbj") { const b = metricValue("bbj40"); if (b) { v = { val: fmtSec(toSec(b.val) * 2), s: b.s }; src = "test ×2"; } }
-      if (!v && fromTests[st.key]) { v = metricValue(fromTests[st.key]); src = "test"; }
-      const sec = v ? toSec(v.val) : null;
-      const goal = toSec(st[tg]);
-      const diff = sec ? sec - goal : null;
-      return `<tr><td><span class="num">${st.n}</span>${esc(st.name)}<small class="src">${st.dist}${st.load !== "—" ? " · " + st.load : ""}</small></td><td class="nowrap">${st[tg]}</td><td>${sec ? `<b>${fmtSec(sec)}</b><small class="src">${src}</small>` : "—"}</td>
-        <td class="${diff == null ? "" : diff > 0 ? "neg" : "pos"}">${diff == null ? "" : (diff > 0 ? "+" : "−") + fmtSec(Math.abs(diff))}</td></tr>`;
-    });
-    return `<section class="card"><div class="row-between"><h2>Ejercicios específicos</h2>
+    const tests = [
+      ...WEEKS.flatMap((w) => w.sessions.filter((x) => x.metrics === "test5k").map((x) => ({ s: x, key: "t5k", label: `Test 5 km (S${w.week})`, dist: 5 }))),
+      ...WEEKS.flatMap((w) => w.sessions.filter((x) => x.metrics === "test10k").map((x) => ({ s: x, key: "t10k", label: `Test 10 km (S${w.week})`, dist: 10 }))),
+      ...WEEKS.flatMap((w) => w.sessions.filter((x) => x.metrics === "race10k").map((x) => ({ s: x, key: "race10k", label: "<b>10K</b>", dist: 10 }))),
+    ].map((t) => ({ ...t, v: Store.getLog(t.s.id)?.metrics?.[t.key] || null }));
+    const done = tests.filter((t) => t.v && toSec(t.v));
+    const last = done[done.length - 1];
+    // Predicción de Riegel (exponente 1,06) desde el último test
+    const pred = last ? toSec(last.v) * Math.pow(10 / last.dist, 1.06) : toSec("20:00") * Math.pow(2, 1.06);
+    const goal = toSec(ATHLETE.targets[tg].total);
+    const gap = pred - goal;
+    return `<section class="card"><div class="row-between"><h2>Carrera 10K</h2>
       <div class="seg mini" id="tgSeg"><button data-v="A" class="${tg === "A" ? "on" : ""}">A</button><button data-v="B" class="${tg === "B" ? "on" : ""}">B</button></div></div>
-      <p class="muted">Tiempo de referencia (nivel ${tg}) frente a tu mejor dato registrado en tests y simulacros.</p>
-      <div class="scroll-x"><table class="tbl stations-tbl"><thead><tr><th>Ejercicio</th><th>Ref.</th><th>Tú</th><th>Dif.</th></tr></thead><tbody>${rows.join("")}</tbody></table></div>
+      <div class="kpis three">
+        <div><span>Predicción actual</span><b>${fmtSec(pred)}</b></div>
+        <div><span>Objetivo ${tg}</span><b>${ATHLETE.targets[tg].total}</b></div>
+        <div><span>Diferencia</span><b class="${gap <= 0 ? "pos" : "neg"}">${gap <= 0 ? "−" : "+"}${fmtSec(Math.abs(gap))}</b></div>
+      </div>
+      <p class="muted tiny">Predicción con la fórmula de Riegel a partir de ${last ? `tu ${last.label.replace(/<[^>]+>/g, "")}` : "tu 5 km de partida (20:00)"}. Ritmo objetivo: ${ATHLETE.targets[tg].pace}.</p>
+      <div class="scroll-x"><table class="tbl"><thead><tr><th>Test</th><th>Tiempo</th><th>Ritmo</th><th>10K equiv.</th></tr></thead><tbody>
+        <tr><td class="muted">Punto de partida</td><td>20:00</td><td>4:00/km</td><td>${fmtSec(toSec("20:00") * Math.pow(2, 1.06))}</td></tr>
+        ${tests.map((t) => { const sec = t.v ? toSec(t.v) : null;
+          return `<tr><td>${t.label}<small class="src">${fmtDate(t.s.date)}</small></td><td>${sec ? `<a href="#/sesion/${t.s.id}"><b>${esc(t.v)}</b></a>` : "—"}</td><td>${sec ? fmtSec(sec / t.dist) + "/km" : ""}</td><td>${sec ? fmtSec(sec * Math.pow(10 / t.dist, 1.06)) : ""}</td></tr>`; }).join("")}
+      </tbody></table></div>
+      <p class="muted tiny">Para el sub-38 deberías hacer el 5 km en ~18:15 y el test de 10 km (S10) por debajo de 39:00.</p>
     </section>`;
-  }
-
-  function testsTable() {
-    const T = [
-      ["Test 30' · distancia", "dist30", null, "m"], ["Test 30' · ritmo", "pace30", null, "/km"], ["FC de umbral", "hr20", null, "ppm"],
-      ["5RM sentadilla", "sq5rm", null, "kg"], ["5RM peso muerto", "dl5rm", null, "kg"],
-      ["1.000 m SkiErg", "ski1000", "ski1000r", "<3:40"], ["1.000 m remo", "row1000", "row1000r", "<3:40"],
-      ["Sled push 50 m", "push50", null, ""], ["Sled pull 50 m", "pull50", null, ""], ["Burpee BJ 40 m", "bbj40", null, ""],
-      ["Farmers 200 m", "farm200", null, ""], ["Lunges 100 m", "lunge100", null, ""], ["Wall balls seguidas", "wbmax", null, ""], ["100 wall balls", "wb100", null, "≤4 series"],
-      ["Simulacro parcial 1.ª mitad", "half1", null, ""], ["Simulacro parcial 2.ª mitad", "half2", null, ""],
-    ];
-    const sims = [6, 10, 13].map((wk) => { const s = WEEKS[wk - 1].sessions[5]; return { wk, s, v: Store.getLog(s.id)?.metrics?.total }; });
-    return `<section class="card"><h2>Tests y simulacros</h2><div class="scroll-x"><table class="tbl"><thead><tr><th>Test</th><th>S1</th><th>Retest</th><th>Ref.</th></tr></thead><tbody>
-      ${T.map(([l, k, r, ref]) => { const a = metricValue(k), b = r ? metricValue(r) : null;
-        return `<tr><td>${l}</td><td>${a ? `<a href="#/sesion/${a.s.id}">${esc(a.val)}</a>` : "—"}</td><td>${b ? `<a href="#/sesion/${b.s.id}">${esc(b.val)}</a>` : r ? "S4: —" : ""}</td><td class="muted">${ref}</td></tr>`; }).join("")}
-      ${sims.map((x) => `<tr><td>${x.wk === 13 ? "<b>Prueba final (S13)</b>" : `Simulacro completo #${x.wk === 6 ? 1 : 2} (S${x.wk})`}</td><td colspan="2">${x.v ? `<a href="#/sesion/${x.s.id}"><b>${esc(x.v)}</b></a>` : "—"}</td><td class="muted">${x.wk === 6 ? "<66' → A" : x.wk === 10 ? "≤61' → A" : ""}</td></tr>`).join("")}
-    </tbody></table></div>
-    <p class="muted tiny">Referencias para mediados de enero: 5 km en ~18:45, SkiErg y remo por debajo de 3:40 y 100 wall balls en 4 series o menos.</p></section>`;
   }
 
   // ——— Guía ———
   function viewGuia() {
     app.innerHTML = `
       <section class="pagehead"><div class="eyebrow">Referencias</div><h1 class="display">Guía</h1></section>
-      <section class="card"><h2>Zonas y ritmos</h2><p class="muted">Basadas en 5 km en 20:00. Se recalculan con el test de 30' (S1) y el simulacro #1 (S6).</p>
+      <section class="card"><h2>Zonas y ritmos</h2><p class="muted">Basadas en 5 km en 20:00. Se recalculan con el test de 5 km (S1 y S7) y el de 10 km (S10).</p>
         <div class="zones">${ZONES.map((z) => `<div class="zone"><span class="zchip z-${z.z.toLowerCase()}">${z.z}</span><div><b>${z.name}</b><small>${z.use}</small></div>
           <div class="zone-v"><b>${z.pace}</b><small>${z.erg !== "—" ? `ergo ${z.erg}` : ""}${z.hr !== "—" ? ` · ${z.hr}` : ""}</small></div></div>`).join("")}</div>
         ${hrZones()}</section>
-      <section class="card"><h2>Ejercicios específicos</h2><p class="muted">Técnica y claves de ejecución.</p><div class="stations">
-        ${STATIONS.map((s) => `<details class="station"><summary><span class="num">${s.n}</span><span><b>${s.name}</b><small>${s.dist}${s.load !== "—" ? " · " + s.load : ""}</small></span><span class="goal">${s.A}<small>${s.B}</small></span>${ico("chev", "chev")}</summary>
-          <p><b>Norma:</b> ${esc(s.rule)}</p><p><b>Técnica:</b> ${esc(s.tech)}</p><p><b>Clave:</b> ${esc(s.strat)}</p></details>`).join("")}
-      </div></section>
+      <section class="card"><h2>Estrategia del 10K</h2><ul class="bul">${RACE_TIPS.map((x) => `<li>${esc(x)}</li>`).join("")}</ul></section>
+      <section class="card"><h2>Funcional</h2><p class="muted">Finishers cortos al final de Pierna A y Pierna B: 8–12' intensos, sin llegar destrozado. Suman acondicionamiento y trabajo de cuerpo entero sin restar a la hipertrofia.</p>
+        <ul class="bul"><li>Elige cargas que te permitan moverte sin pararte.</li><li>En descargas y en la semana del test, solo core.</li><li>Si el día siguiente hay series de carrera y vas cargado, sáltatelo.</li></ul></section>
       <section class="card"><h2>Si pierdes un día</h2><ul class="bul">${FATIGUE.missed.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>
         <p class="muted">Dolor punzante o localizado en articulación o tendón: para la sesión. Agujetas o fatiga difusa no son motivo para parar. Vigila lumbar y cadera en sled push, lunges y peso muerto.</p></section>
       ${trafficLight()}
@@ -776,10 +770,11 @@
   }
 
   function hrZones() {
-    const hr = num(metricValue("hr20")?.val);
-    if (!hr) return `<p class="muted tiny mt">Registra la FC media de los últimos 20' del test de 30' para calcular aquí tus zonas de FC en ppm.</p>`;
+    const hr5 = num(metricValue("t5k_hr")?.val);
+    if (!hr5) return `<p class="muted tiny mt">Registra la FC media del test de 5 km para estimar aquí tus zonas de FC en ppm.</p>`;
+    const hr = Math.round(hr5 * 0.96); // umbral ≈ 96 % de la FC media de un 5 km a tope
     const z = [["Z1", 0, 0.8], ["Z2", 0.8, 0.88], ["Z3", 0.89, 0.94], ["Z4", 0.95, 1.0], ["Z5", 1.02, null]];
-    return `<h3 class="mt">Tus zonas de FC (umbral ${hr} ppm)</h3><div class="hrz">${z.map(([n, a, b]) =>
+    return `<h3 class="mt">Tus zonas de FC (umbral estimado ${hr} ppm)</h3><div class="hrz">${z.map(([n, a, b]) =>
       `<div><span class="zchip z-${n.toLowerCase()}">${n}</span><b>${a ? Math.round(hr * a) : "<"}${b ? (a ? "–" : "") + Math.round(hr * b) : "+"}</b></div>`).join("")}</div>`;
   }
 
@@ -1165,13 +1160,14 @@
         ${boost() ? `<button class="btn ghost" id="resetBoost">Quitar ajuste de calorías</button>` : ""}
       </section>
       <section class="card"><h2>Reglas</h2><ul class="bul">${DIET_RULES.map((r) => `<li>${esc(r)}</li>`).join("")}</ul></section>
-      <section class="card"><h2>Horario tipo</h2><p class="muted">Entreno a media mañana.</p>
+      <section class="card"><h2>Horario tipo</h2><p class="muted">Días dobles (lunes y jueves): carrera a media mañana y fuerza por la tarde. Días de solo fuerza: entrena a media mañana o por la tarde, igual.</p>
         <div class="timeline-v">
           <div><b>08:00</b><span>Desayuno: hidratos y algo de proteína, poca grasa y fibra.</span></div>
-          <div><b>10:00–12:00</b><span>Entreno. Agua; en sesiones de más de 75' o simulacros, 30–60 g de hidratos (zumo, dátiles o bebida isotónica).</span></div>
+          <div><b>10:00–11:00</b><span>Carrera (o fuerza). En series y tiradas de más de 75', 30–60 g de hidratos (zumo, dátiles o isotónica).</span></div>
           <div><b>Al terminar</b><span>Batido: whey + plátano + 5 g de creatina.</span></div>
           <div><b>13:00</b><span>Comida grande: el plato más fuerte del día.</span></div>
-          <div><b>17:30</b><span>Merienda: batido ganador casero (~1.000 kcal).</span></div>
+          <div><b>17:00</b><span>Merienda: batido ganador casero (~1.000 kcal), 1–1,5 h antes de la fuerza.</span></div>
+          <div><b>18:30–19:30</b><span>Fuerza en los días dobles.</span></div>
           <div><b>21:00</b><span>Cena + skyr. Si te falta, un extra antes de dormir.</span></div>
         </div></section>
       <section class="card"><h2>Suplementos</h2><ul class="bul">
@@ -1241,8 +1237,8 @@
       </section>
       <section class="card"><h2>Apariencia</h2>
         <div class="seg" id="themeSeg">${[["auto", "Automático"], ["light", "Claro"], ["dark", "Oscuro"]].map(([v, l]) => `<button data-v="${v}" class="${theme === v ? "on" : ""}">${l}</button>`).join("")}</div></section>
-      <section class="card"><h2>Ritmo objetivo</h2><p class="muted">Lo decide el simulacro #1 (S6) y se confirma en el #2 (S10).</p>
-        <div class="seg" id="tgSeg2"><button data-v="A" class="${target() === "A" ? "on" : ""}">A · 4:00/km</button><button data-v="B" class="${target() === "B" ? "on" : ""}">B · 4:12/km</button></div></section>
+      <section class="card"><h2>Ritmo objetivo</h2><p class="muted">Lo decide el test de 10 km de la semana 10.</p>
+        <div class="seg" id="tgSeg2">${["A", "B"].map((k) => `<button data-v="${k}" class="${target() === k ? "on" : ""}">${k} · ${ATHLETE.targets[k].pace} · ${ATHLETE.targets[k].total}</button>`).join("")}</div></section>
       <section class="card"><h2>Instalar en el iPhone</h2><p class="muted">Abre esta página en Safari → Compartir → «Añadir a pantalla de inicio». Funciona como una app y sin conexión.</p></section>
       <section class="card danger-zone"><h2>Borrar todo</h2><p class="muted">Elimina todos los registros de este navegador. Exporta antes una copia.</p><button class="btn danger" id="reset">Borrar todos los registros</button></section>
     `;

@@ -591,3 +591,6 @@ body.noscroll { overflow: hidden; }
 .pick-macros b { display: block; font-size: 1.1rem; }
 .pick-macros small { color: var(--muted); font-size: .7rem; }
 .foodform label { margin-top: 12px; }
+.catchips .chiplink { flex: 0 0 auto; border: 1px solid var(--border); background: var(--surface-2); color: var(--text-2); font-size: .8rem; font-weight: 650; padding: 7px 12px; border-radius: 99px; white-space: nowrap; text-decoration: none; }
+.catchips .chiplink.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+.fbadge { width: auto; min-width: 24px; padding: 0 5px; }
