@@ -783,7 +783,7 @@
     return out;
   }
   const PHASE_INFO = {
-    base: "Vuelta a correr tras meses parado: trote con pausas andando, luego rodajes continuos en Z2 y un fartlek suave. Fuerza a RIR 3.",
+    base: "Vuelta a correr: rodajes continuos en Z2 controlando ritmo y pulso, y un fartlek suave en la S3. Fuerza a RIR 3.",
     descarga: "−40 % de volumen en fuerza y carrera. Se aprovecha la frescura para el test de 5 km (S4 y S8).",
     desarrollo: "Pico de volumen de hipertrofia. Llegan las series (800 m a 1,2 km), el umbral y tiradas de hasta 14 km.",
     especifica: "Bloques largos cerca del ritmo de 10K. La pierna baja un poco de volumen; el torso sigue a tope. Test de 10 km.",
@@ -823,7 +823,7 @@
         <div class="scroll-x"><table class="tbl week-tpl"><thead><tr><th>Día</th><th>Mañana</th><th>Tarde</th></tr></thead><tbody>
         ${WEEK_TEMPLATE.map(([d, m, t]) => `<tr><td><b>${d}</b></td><td>${richText(m)}</td><td>${t ? richText(t) : "<span class='muted'>—</span>"}</td></tr>`).join("")}
         </tbody></table></div>
-        <p class="muted tiny">S1–S3: el lunes y el jueves son rodajes suaves de vuelta a correr; las series empiezan en la S5. Nunca va pierna el día antes de series o de un test. El sábado de descanso deja las piernas frescas para la tirada.</p>
+        <p class="muted tiny">S1–S3: el lunes y el jueves son rodajes en Z2; las series empiezan en la S5. Nunca va pierna el día antes de series o de un test. El sábado de descanso deja las piernas frescas para la tirada.</p>
       </section>
 
       <section class="card"><h2>Fases</h2>
@@ -835,7 +835,7 @@
         <div class="timeline-v">${tests.map((s) => `<div><b>${fmtDate(s.date, true)}</b><span><a class="link" href="#/sesion/${s.id}">${esc(s.title)}</a>${s.metrics === "test5k" ? " · con él ajustamos ritmos" : s.metrics === "test10k" ? " · decide el objetivo A o B" : " · la carrera"}</span></div>`).join("")}</div>
       </section>
 
-      <section class="card"><h2>Zonas y ritmos</h2><p class="muted">Orientativas (5 km en 20:00). Se recalculan con el test de 5 km (S4 y S8) y el de 10 km (S10). Hasta la S4 corre solo por sensaciones, en Z1–Z2.</p>
+      <section class="card"><h2>Zonas y ritmos</h2><p class="muted">Orientativas (5 km en 20:00). Se recalculan con el test de 5 km (S4 y S8) y el de 10 km (S10). Hasta la S4, todo en Z2: apunta ritmo y FC para ver cómo mejora la forma.</p>
         <div class="zones">${ZONES.map((z) => `<div class="zone"><span class="zchip z-${z.z.toLowerCase()}">${z.z}</span><div><b>${z.name}</b><small>${z.use}</small></div>
           <div class="zone-v"><b>${z.z === "RO" ? ATHLETE.targets[tg].pace : z.pace}</b><small>${z.hr !== "—" ? z.hr + " FC umbral" : ""}</small></div></div>`).join("")}</div>
         ${hrZones()}
