@@ -597,3 +597,25 @@ body.noscroll { overflow: hidden; }
 .daychips { margin-top: 10px; padding-bottom: 2px; }
 .daychips button { font-size: .82rem; padding: 7px 13px; }
 .daytype-why { margin: 4px 2px 0; font-size: .82rem; color: var(--text-2); font-weight: 550; }
+
+/* ============ Guía ============ */
+.goals { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
+.goal-card { padding: 12px; border-radius: 14px; background: var(--surface-2); border: 1.5px solid transparent; }
+.goal-card.on { border-color: var(--accent); background: var(--accent-soft); }
+.goal-card small { display: block; font-size: .72rem; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+.goal-card b { display: block; font-size: 1.6rem; font-weight: 800; letter-spacing: -.03em; margin-top: 2px; }
+.goal-card span { color: var(--text-2); font-weight: 600; font-size: .88rem; }
+.week-tpl td { font-size: .86rem; }
+.week-tpl td:first-child { white-space: nowrap; }
+.phases { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+.phase-row { display: flex; gap: 12px; padding: 11px 12px; border-radius: 14px; background: var(--surface-2); text-decoration: none; border: 1.5px solid transparent; }
+.phase-row.now { border-color: var(--ph); }
+.phase-row > i { flex: 0 0 4px; border-radius: 4px; background: var(--ph); }
+.phase-row b { display: block; font-size: .92rem; }
+.phase-row b small { font-weight: 600; color: var(--muted); font-size: .76rem; margin-left: 4px; }
+.phase-row span { display: block; font-size: .82rem; color: var(--text-2); margin-top: 2px; }
+.split { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 6px; margin-top: 12px; }
+.split-item { display: flex; flex-direction: column; gap: 2px; padding: 10px 12px; border-radius: 12px; background: var(--surface-2); text-decoration: none; }
+.split-item .fbadge { margin: 0 0 4px; align-self: flex-start; }
+.split-item b { font-size: .9rem; }
+.split-item small { color: var(--muted); font-size: .74rem; }

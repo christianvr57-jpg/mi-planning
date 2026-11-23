@@ -743,29 +743,103 @@
   }
 
   // ——— Guía ———
+  function phaseBlocks() {
+    // Agrupa semanas consecutivas de la misma fase
+    const out = [];
+    WEEKS.forEach((w) => {
+      const last = out[out.length - 1];
+      if (last && last.phase === w.phase) { last.to = w; } else out.push({ phase: w.phase, from: w, to: w });
+    });
+    return out;
+  }
+  const PHASE_INFO = {
+    base: "Medir (test de 5 km), buscar cargas a RIR 3 y construir base aeróbica con series cortas y umbral.",
+    descarga: "−40 % de volumen en fuerza y carrera. Se mantiene algo de intensidad para no perder chispa.",
+    desarrollo: "Pico de volumen de hipertrofia. Series de 1–1,2 km, umbral largo y tiradas de hasta 15 km.",
+    especifica: "Bloques largos cerca del ritmo de 10K. La pierna baja un poco de volumen; el torso sigue a tope. Test de 10 km.",
+    afinado: "Últimas sesiones duras a ritmo de carrera. La pierna pasa a mantenimiento.",
+    carrera: "Frescura: poco volumen, toques de ritmo, carga de hidratos jueves y viernes.",
+  };
+  const WEEK_TEMPLATE = [
+    ["Lunes", "Series en pista", "Torso A"],
+    ["Martes", "Pierna A + funcional", ""],
+    ["Miércoles", "Opcional: 30' Z2 (desde S5)", "Torso B"],
+    ["Jueves", "Umbral o tempo", "Brazos y hombro"],
+    ["Viernes", "Pierna B + funcional", ""],
+    ["Sábado", "Descanso", ""],
+    ["Domingo", "Tirada larga", ""],
+  ];
+  const FX_BY_PHASE = [
+    ["Base (S1–S4)", [FX.base1, FX.base2]],
+    ["Desarrollo (S5–S8)", [FX.des1, FX.des2]],
+    ["Específica (S9–S12)", [FX.esp1, FX.esp2]],
+    ["Afinado (S13–S15)", [FX.afi1, FX.core]],
+  ];
+
   function viewGuia() {
+    const tg = target();
+    const tests = ALL.filter((s) => s.metrics);
+    const cw = currentWeekNum();
     app.innerHTML = `
-      <section class="pagehead"><div class="eyebrow">Referencias</div><h1 class="display">Guía</h1></section>
+      <section class="pagehead"><div class="eyebrow">Plan 10K · ${WEEKS.length} semanas</div><h1 class="display">Guía</h1>
+        <p class="muted">Prioridad: ganar músculo. La carrera se entrena 3 días con calidad para correr el 10K del ${fmtDate(RACE_DATE, true)} lo mejor posible.</p></section>
+
+      <section class="card"><h2>Tu objetivo</h2>
+        <div class="goals">${["A", "B"].map((k) => `<div class="goal-card ${k === tg ? "on" : ""}"><small>${k === tg ? "Activo · " : ""}Objetivo ${k}</small><b>${ATHLETE.targets[k].total}</b><span>${ATHLETE.targets[k].pace}</span></div>`).join("")}</div>
+        <p class="muted tiny">El test de 10 km del ${fmtDate(tests.find((s) => s.metrics === "test10k")?.date || RACE_DATE, true)} decide con cuál sales: por debajo de 39:00, objetivo A; si no, B. Cámbialo en <a class="link" href="#/datos">Datos</a>. En <a class="link" href="#/progreso">Progreso</a> tienes tu predicción actualizada.</p>
+      </section>
+
+      <section class="card"><h2>Semana tipo</h2><p class="muted">6 días, 2 dobles. Carrera por la mañana y fuerza por la tarde, con 6 h y una comida entre medias.</p>
+        <div class="scroll-x"><table class="tbl week-tpl"><thead><tr><th>Día</th><th>Mañana</th><th>Tarde</th></tr></thead><tbody>
+        ${WEEK_TEMPLATE.map(([d, m, t]) => `<tr><td><b>${d}</b></td><td>${richText(m)}</td><td>${t ? richText(t) : "<span class='muted'>—</span>"}</td></tr>`).join("")}
+        </tbody></table></div>
+        <p class="muted tiny">Nunca va pierna el día antes de series o de un test. El sábado de descanso deja las piernas frescas para la tirada.</p>
+      </section>
+
+      <section class="card"><h2>Fases</h2>
+        <div class="phases">${phaseBlocks().map((b) => `<a class="phase-row ${PHASES[b.phase].color} ${cw >= b.from.week && cw <= b.to.week ? "now" : ""}" href="#/plan/${b.from.week}">
+          <i></i><div><b>${PHASES[b.phase].name} <small>S${b.from.week}${b.to.week !== b.from.week ? "–" + b.to.week : ""} · ${fmtDate(b.from.start)} – ${fmtDate(b.to.end)}</small></b><span>${PHASE_INFO[b.phase]}</span></div></a>`).join("")}</div>
+      </section>
+
+      <section class="card"><h2>Tests y fechas clave</h2>
+        <div class="timeline-v">${tests.map((s) => `<div><b>${fmtDate(s.date, true)}</b><span><a class="link" href="#/sesion/${s.id}">${esc(s.title)}</a>${s.metrics === "test5k" ? " · con él ajustamos ritmos" : s.metrics === "test10k" ? " · decide el objetivo A o B" : " · la carrera"}</span></div>`).join("")}</div>
+      </section>
+
       <section class="card"><h2>Zonas y ritmos</h2><p class="muted">Basadas en 5 km en 20:00. Se recalculan con el test de 5 km (S1 y S7) y el de 10 km (S10).</p>
         <div class="zones">${ZONES.map((z) => `<div class="zone"><span class="zchip z-${z.z.toLowerCase()}">${z.z}</span><div><b>${z.name}</b><small>${z.use}</small></div>
-          <div class="zone-v"><b>${z.pace}</b><small>${z.erg !== "—" ? `ergo ${z.erg}` : ""}${z.hr !== "—" ? ` · ${z.hr}` : ""}</small></div></div>`).join("")}</div>
-        ${hrZones()}</section>
+          <div class="zone-v"><b>${z.z === "RO" ? ATHLETE.targets[tg].pace : z.pace}</b><small>${z.hr !== "—" ? z.hr + " FC umbral" : ""}</small></div></div>`).join("")}</div>
+        ${hrZones()}
+        <p class="muted tiny mt">Las series se miden por metros. En pista, vuelta automática por distancia en el reloj (o pulsa vuelta al llegar a los metros de la serie).</p></section>
+
+      <section class="card"><h2>Hipertrofia</h2><p class="muted">Torso/Pierna + brazos: cada grupo muscular, 2 veces por semana. Detalle y progresión en <a class="link" href="#/fuerza">Fuerza</a>.</p>
+        <ul class="bul">${STRENGTH_RULES.map((r) => `<li>${esc(r)}</li>`).join("")}</ul>
+        <div class="split">${STRENGTH_ORDER.map((k) => `<a href="#/fuerza/${k}" class="split-item"><span class="fbadge">${k}</span><b>${STRENGTH[k].label}</b><small>${STRENGTH[k].day}</small></a>`).join("")}</div>
+      </section>
+
+      <section class="card"><h2>Funcional</h2><p class="muted">Finishers de 8–12' al final de Pierna A y Pierna B: acondicionamiento y cuerpo entero sin restar a la hipertrofia ni castigar la pierna antes de correr.</p>
+        ${FX_BY_PHASE.map(([ph, list]) => `<h3 class="mt">${ph}</h3><ul class="bul">${list.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>`).join("")}
+        <p class="muted tiny mt">Cargas que te dejen moverte sin pararte. En descargas y antes de tests, solo core. Si al día siguiente hay series y vas cargado, sáltatelo.</p></section>
+
       <section class="card"><h2>Estrategia del 10K</h2><ul class="bul">${RACE_TIPS.map((x) => `<li>${esc(x)}</li>`).join("")}</ul></section>
-      <section class="card"><h2>Funcional</h2><p class="muted">Finishers cortos al final de Pierna A y Pierna B: 8–12' intensos, sin llegar destrozado. Suman acondicionamiento y trabajo de cuerpo entero sin restar a la hipertrofia.</p>
-        <ul class="bul"><li>Elige cargas que te permitan moverte sin pararte.</li><li>En descargas y en la semana del test, solo core.</li><li>Si el día siguiente hay series de carrera y vas cargado, sáltatelo.</li></ul></section>
-      <section class="card"><h2>Si pierdes un día</h2><ul class="bul">${FATIGUE.missed.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>
-        <p class="muted">Dolor punzante o localizado en articulación o tendón: para la sesión. Agujetas o fatiga difusa no son motivo para parar. Vigila lumbar y cadera en sled push, lunges y peso muerto.</p></section>
+
       ${trafficLight()}
+
+      <section class="card"><h2>Si pierdes un día</h2><ul class="bul">${FATIGUE.missed.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>
+        <p class="muted">Dolor punzante o localizado en una articulación o tendón: para la sesión. Agujetas o fatiga difusa no son motivo para parar. Vigila lumbar y cadera en sentadilla, peso muerto y zancada búlgara: técnica antes que kilos.</p></section>
+
+      <section class="card"><h2>Comida y recuperación</h2><p class="muted">Volumen: ganar 0,4–0,7 kg por semana. Menús, checklist y lista de la compra en <a class="link" href="#/nutricion">Comida</a>.</p>
+        <div class="scroll-x"><table class="tbl"><thead><tr><th>Tipo de día</th><th>kcal</th><th>Hidratos</th></tr></thead><tbody>
+          ${["doble", "pierna", "torso", "tirada", "descanso"].map((k) => { const t = targetsFor(k); return `<tr><td>${DAY_TYPES[k].name}<small class="src">${esc(DAY_TYPES[k].why)}</small></td><td>${fmtNum(t.kcal, 0)}</td><td>${t.c} g</td></tr>`; }).join("")}
+        </tbody></table></div>
+        <ul class="bul mt">
+          <li><b>Proteína:</b> 180–215 g/día en 4–5 tomas; una en las 2 h tras entrenar.</li>
+          <li><b>Creatina:</b> 5 g todos los días.</li>
+          <li><b>Sueño:</b> 7–8 h. En los días dobles, una siesta de 20' entre sesiones ayuda mucho.</li>
+          <li><b>Peso:</b> cada mañana en ayunas; manda la media semanal, no el dato suelto.</li>
+          <li><b>Semana del 10K:</b> carga de hidratos jueves y viernes (7–8 g/kg) y desayuno 3 h antes de la salida.</li>
+        </ul></section>
+
       <section class="card"><h2>Abreviaturas</h2><dl class="facts">${ABBR.map(([a, b]) => `<div><dt><b>${a}</b></dt><dd>${esc(b)}</dd></div>`).join("")}</dl></section>
-      <section class="card"><h2>Nutrición y recuperación</h2><div class="scroll-x"><table class="tbl"><tbody>
-        <tr><td>Proteína</td><td>150–175 g/día · 4–5 tomas de 30–40 g</td></tr>
-        <tr><td>Hidratos días suaves</td><td>320–400 g (mié, dom)</td></tr>
-        <tr><td>Hidratos días duros</td><td>490–570 g (lun, mar, jue, sáb)</td></tr>
-        <tr><td>Creatina</td><td>3–5 g/día</td></tr>
-        <tr><td>Peso</td><td>2 veces por semana en ayunas</td></tr>
-        <tr><td>Sueño</td><td>7–8 h; siesta de 20' en días dobles</td></tr>
-        <tr><td>Semana final</td><td>Jue–vie 7–8 g/kg de hidratos; desayuno 3 h antes con 120–160 g</td></tr>
-      </tbody></table></div></section>
     `;
   }
 
