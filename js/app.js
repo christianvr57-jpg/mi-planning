@@ -198,9 +198,77 @@
       </div>
       ${stepsHtml(s.steps)}
       ${label.startsWith("Hoy") || label.startsWith("Primera") || label.startsWith("Última") ? s.strength.map((k) => strengthBlock(k, s.week, s.id, false)).join("") : ""}
+      ${watchNotesHtml(s)}
       ${label.startsWith("Hoy") || label.startsWith("Primera") || label.startsWith("Última") ? `<a class="btn primary block" href="#/sesion/${s.id}">${log ? `${ico("check")} ${STATUS[log.status]} · ver registro` : "Registrar sesión"}</a>` : ""}
     </section>`;
   }
+
+  // ——— Notas para el reloj (SuuntoPlus Notes: hasta 10 notas, "|" = salto de línea) ———
+  const watchTxt = (x) => String(x).replace(/×/g, "x").replace(/[–—−]/g, "-").replace(/[“”″]/g, '"').replace(/[‘’′]/g, "'").replace(/\|/g, "/").replace(/\s+/g, " ").trim();
+  const shortEx = (ex) => ex.replace(/\s*\(.*?\)\s*/g, " ").trim();
+  function watchNotes(s) {
+    if (!s || s.kind === "rest") return [];
+    const notes = [];
+    const labels = (s.strength || []).map((k) => STRENGTH[k].label);
+    const isRef = (x) => labels.some((l) => x.startsWith(l));
+    // Pasos agrupados por mañana / tarde
+    const groups = [];
+    s.steps.forEach((x) => {
+      const m = x.match(/^(Mañana|Tarde):\s*(.*)$/);
+      if (m || !groups.length) groups.push({ t: m ? m[1] : "", items: [] });
+      groups[groups.length - 1].items.push(m ? m[2] : x);
+    });
+    groups.forEach((g) => {
+      const items = g.items.filter(Boolean);
+      const runGroup = g.t === "Mañana" || (!g.t && ["run", "test", "race"].includes(s.kind));
+      if (runGroup) {
+        const ro = ATHLETE.targets[target()].pace.replace("/km", "");
+        const run = items.map((x) => x === "C" ? "Calent: 2 km Z1-Z2 + 4x80 m" : x === "VC" ? "Calma: 1,5 km Z1" : x.replace(/^C \((\d+')\)/, "Calent. $1").replace(/\bRO\b/g, `RO (${ro})`));
+        notes.push({ title: g.t === "Mañana" ? "Carrera (mañana)" : "Carrera", text: [g.t === "Mañana" ? "MAÑANA" : s.title.toUpperCase(), ...run].map(watchTxt).join("|") });
+        return;
+      }
+      items.filter((x) => !isRef(x)).forEach((x) => {
+        const m = x.match(/^([^:]{2,40}):\s*(.*)$/);
+        const lines = m ? [m[1], ...m[2].split(/\s*(?:\+|;|,(?=\s*\d))\s*/)] : [x];
+        notes.push({ title: m ? m[1] : "Extra", text: lines.map(watchTxt).filter(Boolean).join("|") });
+      });
+    });
+    // Un ejercicio por nota, con la carga de la última vez y la sugerida
+    (s.strength || []).forEach((k) => {
+      const t = STRENGTH[k], ci = t.weekCol[s.week];
+      const rows = t.rows.filter((r) => parseScheme(r.values[ci]));
+      rows.forEach((r, i) => {
+        const prev = lastSets(r.ex, s.date);
+        const sug = suggestKg(k, parseScheme(r.values[ci]), prev);
+        const lines = [`${k} ${i + 1}/${rows.length}`, shortEx(r.ex), r.values[ci]];
+        if (sug) lines.push(`Hoy: ${kgStr(sug.kg)} kg${sug.up ? " (sube)" : ""}`);
+        if (prev) lines.push(`Ult: ${prev.text}`);
+        notes.splice(notes.length, 0, { title: shortEx(r.ex), text: lines.map(watchTxt).join("|"), ex: true });
+      });
+    });
+    // Orden: carrera, ejercicios, extras (funcional, core…) al final
+    const order = (n) => (n.title.startsWith("Carrera") ? 0 : n.ex ? 1 : 2);
+    notes.sort((a, b) => order(a) - order(b));
+    // La app admite 10 notas: si sobran, se juntan en la última
+    if (notes.length > 10) {
+      const rest = notes.splice(9);
+      notes.push({ title: "Resto", text: rest.map((n) => n.text).join("|") });
+    }
+    return notes;
+  }
+  function watchNotesHtml(s) {
+    const notes = watchNotes(s);
+    if (!notes.length) return "";
+    return `<details class="watch"><summary>⌚ Notas para el reloj <small>${notes.length} nota${notes.length > 1 ? "s" : ""}</small></summary>
+      <p class="muted tiny">Copia cada una y pégala en <b>Note 1, Note 2…</b> de la app Notes (SuuntoPlus). La barra «|» es un salto de línea en el reloj.</p>
+      ${notes.map((n, i) => `<div class="wnote"><div class="wnote-h"><b>Note ${i + 1}</b><span>${esc(n.title)}</span><button type="button" class="chip-btn" data-copy-note="${esc(n.text)}">Copiar</button></div>
+        <div class="wnote-p">${n.text.split("|").map(esc).join("<br>")}</div></div>`).join("")}
+    </details>`;
+  }
+  document.addEventListener("click", (e) => {
+    const b = e.target.closest("[data-copy-note]");
+    if (b) { e.preventDefault(); copy(b.dataset.copyNote, b); }
+  });
 
   // ——— Hoy ———
   function viewHoy() {
