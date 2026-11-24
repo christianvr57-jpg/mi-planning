@@ -251,17 +251,35 @@
     notes.sort((a, b) => order(a) - order(b));
     return notes;
   }
-  // Todo el entreno en una sola nota, en una línea, separada por "|"
+  // Nombres mínimos para el reloj
+  const EX_SHORT = {
+    "Press banca con barra": "Banca", "Dominadas (lastre si haces más de 8)": "Domin", "Press militar con mancuernas": "Militar",
+    "Remo con barra": "Remo barra", "Press inclinado con mancuernas": "Incl manc", "Face pull": "Face pull",
+    "Sentadilla trasera": "Sent", "Prensa de piernas": "Prensa", "Peso muerto rumano": "PM rum", "Extensión de cuádriceps": "Ext cuad",
+    "Gemelo de pie": "Gemelo", "Rueda abdominal": "Rueda", "Press inclinado con barra": "Incl barra", "Jalón al pecho": "Jalon",
+    "Remo en polea baja": "Remo polea", "Fondos en paralelas (lastre si puedes)": "Fondos", "Aperturas en máquina o polea": "Aperturas",
+    "Elevaciones laterales": "Laterales", "Curl con barra Z": "Curl Z", "Press francés": "Frances", "Curl inclinado con mancuernas": "Curl incl",
+    "Extensión de tríceps en polea": "Triceps polea", "Elevaciones laterales en polea": "Lat polea", "Pájaros (deltoides posterior)": "Pajaros",
+    "Curl martillo": "Martillo", "Peso muerto convencional": "PM", "Zancada búlgara (mancuernas)": "Bulgara", "Hip thrust": "Hip thrust",
+    "Curl femoral": "Femoral", "Gemelo sentado": "Gemelo sent", "Elevación de piernas colgado": "Elev piernas",
+  };
+  const schemeShort = (v) => watchTxt(v.replace(/\s*RIR.*$/i, "").replace(/\/pierna/, "/p").replace(/máx/i, "max"));
+  // Todo el entreno en una sola nota, en una línea, separada por "|": solo ejercicio y series
   function watchNote(s) {
-    const notes = watchNotes(s);
-    if (!notes.length) return "";
-    return [watchTxt(`${s.day} - ${s.title}`), ...notes.map((n) => n.text)].join("|");
+    if (!s || s.kind === "rest") return "";
+    const lines = [];
+    (s.strength || []).forEach((k) => {
+      const ci = STRENGTH[k].weekCol[s.week];
+      STRENGTH[k].rows.forEach((r) => { if (parseScheme(r.values[ci])) lines.push(`${EX_SHORT[r.ex] || shortEx(r.ex)} ${schemeShort(r.values[ci])}`); });
+    });
+    if (!lines.length) return watchNotes(s).map((n) => n.text).join("|"); // días solo de carrera
+    return lines.join("|");
   }
   function watchNotesHtml(s) {
     const text = watchNote(s);
     if (!text) return "";
     return `<details class="watch"><summary>⌚ Nota para el reloj</summary>
-      <p class="muted tiny">Todo el entreno en una sola nota de una línea. Pégala en <b>Note 1</b> de la app Notes (SuuntoPlus): cada «|» es un salto de línea en el reloj.</p>
+      <p class="muted tiny">Ejercicios y series en una sola línea. Pégala en <b>Note 1</b> de la app Notes (SuuntoPlus): cada «|» es un salto de línea en el reloj.</p>
       <div class="wnote"><div class="wnote-h"><b>Note 1</b><span>${text.length} caracteres</span><button type="button" class="chip-btn" data-copy-note="${esc(text)}">Copiar</button></div>
         <div class="wnote-p">${esc(text)}</div></div>
     </details>`;
