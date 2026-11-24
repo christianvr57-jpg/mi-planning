@@ -251,43 +251,69 @@
     notes.sort((a, b) => order(a) - order(b));
     return notes;
   }
-  // Nombres mínimos para el reloj
+  // ——— Nota del reloj ———
+  // Pantalla (Suunto, texto Medium): ~10 líneas visibles y ~24 caracteres por línea sin que salte.
+  const WATCH_LINES = 10, WATCH_W = 24;
+  // [nombre claro, nombre mínimo]: se usa el mínimo solo si la línea no cabe
   const EX_SHORT = {
-    "Press banca con barra": "Banca", "Dominadas (lastre si haces más de 8)": "Domin", "Press militar con mancuernas": "Militar",
-    "Remo con barra": "Remo barra", "Press inclinado con mancuernas": "Incl manc", "Face pull": "Face pull",
-    "Sentadilla trasera": "Sent", "Prensa de piernas": "Prensa", "Peso muerto rumano": "PM rum", "Extensión de cuádriceps": "Ext cuad",
-    "Gemelo de pie": "Gemelo", "Rueda abdominal": "Rueda", "Press inclinado con barra": "Incl barra", "Jalón al pecho": "Jalon",
-    "Remo en polea baja": "Remo polea", "Fondos en paralelas (lastre si puedes)": "Fondos", "Aperturas en máquina o polea": "Aperturas",
-    "Elevaciones laterales": "Laterales", "Curl con barra Z": "Curl Z", "Press francés": "Frances", "Curl inclinado con mancuernas": "Curl incl",
-    "Extensión de tríceps en polea": "Triceps polea", "Elevaciones laterales en polea": "Lat polea", "Pájaros (deltoides posterior)": "Pajaros",
-    "Curl martillo": "Martillo", "Peso muerto convencional": "PM", "Zancada búlgara (mancuernas)": "Bulgara", "Hip thrust": "Hip thrust",
-    "Curl femoral": "Femoral", "Gemelo sentado": "Gemelo sent", "Elevación de piernas colgado": "Elev piernas",
+    "Press banca con barra": ["Press banca", "Banca"], "Dominadas (lastre si haces más de 8)": ["Dominadas", "Domin"],
+    "Press militar con mancuernas": ["Press militar", "Militar"], "Remo con barra": ["Remo barra", "Remo"],
+    "Press inclinado con mancuernas": ["Incl mancuer", "Incl manc"], "Face pull": ["Face pull", "Face pull"],
+    "Sentadilla trasera": ["Sentadilla", "Sent"], "Prensa de piernas": ["Prensa", "Prensa"], "Peso muerto rumano": ["PM rumano", "PM rum"],
+    "Extensión de cuádriceps": ["Ext cuadri", "Ext cuad"], "Gemelo de pie": ["Gemelo pie", "Gemelo"], "Rueda abdominal": ["Rueda abdo", "Rueda"],
+    "Press inclinado con barra": ["Incl barra", "Incl barra"], "Jalón al pecho": ["Jalon pecho", "Jalon"],
+    "Remo en polea baja": ["Remo polea", "Remo pol"], "Fondos en paralelas (lastre si puedes)": ["Fondos", "Fondos"],
+    "Aperturas en máquina o polea": ["Aperturas", "Apert"], "Elevaciones laterales": ["Laterales", "Lat"],
+    "Curl con barra Z": ["Curl barra Z", "Curl Z"], "Press francés": ["Press frances", "Frances"],
+    "Curl inclinado con mancuernas": ["Curl inclinado", "Curl incl"], "Extensión de tríceps en polea": ["Triceps polea", "Tri polea"],
+    "Elevaciones laterales en polea": ["Lat polea", "Lat pol"], "Pájaros (deltoides posterior)": ["Pajaros", "Pajaros"],
+    "Curl martillo": ["Curl martillo", "Martillo"], "Peso muerto convencional": ["Peso muerto", "PM"],
+    "Zancada búlgara (mancuernas)": ["Bulgara", "Bulgara"], "Hip thrust": ["Hip thrust", "Hip thr"],
+    "Curl femoral": ["Curl femoral", "Femoral"], "Gemelo sentado": ["Gemelo sent", "Gem sent"], "Elevación de piernas colgado": ["Elev piernas", "Elev pier"],
   };
-  const schemeShort = (v) => watchTxt(v.replace(/\s*RIR.*$/i, "").replace(/\/pierna/, "/p").replace(/máx/i, "max"));
-  // Todo el entreno en una sola nota, en una línea, separada por "|": solo ejercicio y series
-  function watchNote(s) {
-    if (!s || s.kind === "rest") return "";
+  // Finishers en una línea
+  const FX_SHORT = { base1: "Fx 3r remo/KB/farmers", base2: "Fx 4x sled 25m+10 WB", des1: "Fx EMOM12 remo/KB/farm", des2: "Fx AMRAP12 ski/burp/WB",
+    esp1: "Fx 5x ski 10+8 thrust", esp2: "Fx 4x sled+sandbag", afi1: "Fx 4x remo200+10 KB", core: "Core plank/Pallof/bug" };
+  const schemeParts = (v) => {
+    const m = v.match(/^(.*?)\s*RIR\s*(.*)$/i);
+    const sets = watchTxt((m ? m[1] : v).replace(/\/pierna/, "/p").replace(/máx/i, "max"));
+    return { sets, rir: m ? "R" + watchTxt(m[2]) : "" };
+  };
+  // Línea de un ejercicio: «Sentadilla 4x6-8 R2 85». Si no cabe, quita el RIR y luego acorta el nombre.
+  function exLine(ex, v, kg) {
+    const [long, short] = EX_SHORT[ex] || [shortEx(ex), shortEx(ex)];
+    const { sets, rir } = schemeParts(v);
+    const k = kg != null ? kgStr(kg) : "";
+    const opts = [[long, sets, rir, k], [long, sets, k], [short, sets, rir, k], [short, sets, k]].map((x) => x.filter(Boolean).join(" "));
+    return opts.find((x) => x.length <= WATCH_W) || opts[opts.length - 1];
+  }
+  function watchLines(s) {
+    if (!s || s.kind === "rest") return [];
     const lines = [];
     (s.strength || []).forEach((k) => {
       const ci = STRENGTH[k].weekCol[s.week];
       STRENGTH[k].rows.forEach((r) => {
         const sc = parseScheme(r.values[ci]);
         if (!sc) return;
-        // kg sugeridos (o los de la última vez) si hay registros previos
         const sug = suggestKg(k, sc, lastSets(r.ex, s.date));
-        lines.push(`${EX_SHORT[r.ex] || shortEx(r.ex)} ${schemeShort(r.values[ci])}${sug ? " " + kgStr(sug.kg) : ""}`);
+        lines.push(exLine(r.ex, r.values[ci], sug ? sug.kg : null));
       });
     });
-    if (!lines.length) return watchNotes(s).map((n) => n.text).join("|"); // días solo de carrera
-    return lines.join("|");
+    if (!lines.length) return watchNotes(s).map((n) => n.text).join("|").split("|"); // días solo de carrera
+    const fx = Object.keys(FX_SHORT).find((key) => s.detail.includes(FX[key]));
+    if (fx && lines.length < WATCH_LINES) lines.push(FX_SHORT[fx]);
+    return lines;
   }
+  const watchNote = (s) => watchLines(s).join("|");
   function watchNotesHtml(s) {
-    const text = watchNote(s);
-    if (!text) return "";
+    const lines = watchLines(s);
+    if (!lines.length) return "";
+    const text = lines.join("|"), maxW = Math.max(...lines.map((l) => l.length));
+    const warn = lines.length > WATCH_LINES || maxW > WATCH_W;
     return `<details class="watch"><summary>⌚ Nota para el reloj</summary>
-      <p class="muted tiny">Ejercicio, series y kg sugeridos (cuando ya tienes cargas registradas) en una sola línea. Pégala en <b>Note 1</b> de la app Notes (SuuntoPlus): cada «|» es un salto de línea en el reloj.</p>
-      <div class="wnote"><div class="wnote-h"><b>Note 1</b><span>${text.length} caracteres</span><button type="button" class="chip-btn" data-copy-note="${esc(text)}">Copiar</button></div>
-        <div class="wnote-p">${esc(text)}</div></div>
+      <p class="muted tiny">Ejercicio, series, RIR (R) y kg sugeridos cuando ya tienes cargas registradas. Pégala en <b>Note 1</b> de la app Notes (SuuntoPlus).</p>
+      <div class="wnote"><div class="wnote-h"><b>Note 1</b><span class="${warn ? "warn" : ""}">${lines.length}/${WATCH_LINES} líneas · ${maxW}/${WATCH_W} car.</span><button type="button" class="chip-btn" data-copy-note="${esc(text)}">Copiar</button></div>
+        <div class="wnote-p">${lines.map(esc).join("<br>")}</div></div>
     </details>`;
   }
   document.addEventListener("click", (e) => {
