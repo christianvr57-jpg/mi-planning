@@ -507,7 +507,7 @@
         `<div class="ex"><div class="ex-name">${esc(r.ex)}</div><div class="ex-sets">${esc(r.values[ci])}</div></div>`).join("")}</div></div>`;
     }
     return `<div class="strength" data-block="${k}">${head}
-      <p class="muted tiny how">Escribe los kg de la 1.ª serie y toca <b>✓</b> en las demás: se copian solas. Si dejas las reps vacías, cuentan las del plan.</p>
+      <p class="muted tiny how">Ajusta <b>peso</b> y <b>reps</b> y toca la serie al acabarla. Se guarda sola. Para corregir una, tócala otra vez.</p>
       ${t.rows.map((r) => {
         const scheme = parseScheme(r.values[ci]);
         if (!scheme) return "";
@@ -515,50 +515,38 @@
         const sug = suggestKg(k, scheme, prev);
         const saved = log?.sets?.[r.ex] || [];
         const n = Math.max(scheme.sets, saved.length);
-        const baseKg = sug?.kg ?? null;
-        const unit = isDumbbell(r.ex) ? "kg/manc." : isBodyweight(r.ex) ? "lastre" : "kg";
-        return `<div class="exlog" data-ex="${esc(r.ex)}" data-reps="${scheme.reps ?? ""}" data-base="${baseKg ?? ""}">
+        const last = saved[saved.length - 1];
+        const kg0 = last ? last.kg : sug?.kg ?? (prev?.sets ? prev.sets[prev.sets.length - 1].kg : null);
+        const reps0 = last?.reps ?? scheme.reps ?? prev?.sets?.[0]?.reps ?? null;
+        const unit = isDumbbell(r.ex) ? "kg/manc." : isBodyweight(r.ex) ? "lastre kg" : "kg";
+        return `<div class="exlog" data-ex="${esc(r.ex)}" data-reps="${scheme.reps ?? ""}">
           <div class="exlog-head"><div class="ex-name">${esc(r.ex)}<small class="target">${esc(r.values[ci])}</small></div><span class="exlog-stat"></span></div>
-          ${prev ? `<div class="exlog-prev">Última · ${fmtDate(prev.date)}: <b>${esc(prev.text)}</b></div>` : ""}
+          ${prev ? `<div class="exlog-prev">Última · ${fmtDate(prev.date)}: <b>${esc(prev.text)}</b>${sug?.up ? ` · <span class="up">↑ toca subir</span>` : ""}</div>` : ""}
           ${!saved.length && log?.loads?.[r.ex] ? `<div class="exlog-prev">Anotado: <b>${esc(log.loads[r.ex])}</b></div>` : ""}
-          <div class="sets-head"><span></span><span>${unit}</span><span>reps</span><span></span></div><div class="sets">${Array.from({ length: n }, (_, i) => setRow(i, saved[i], scheme.reps)).join("")}</div>
-          <div class="exlog-actions">
-            <button type="button" class="chip-btn" data-act="add">+ Serie</button>
-            ${prev?.sets ? `<button type="button" class="chip-btn" data-act="repeat">Repetir última</button>` : ""}
-            ${sug ? `<button type="button" class="chip-btn ${sug.up ? "up" : ""}" data-act="suggest" data-kg="${sug.kg}">${sug.up ? "↑ " : ""}${kgStr(sug.kg)} kg en todas</button>` : ""}
+          <div class="pick">
+            <div class="pk"><span>Peso <small>${unit}</small></span><div class="stepper"><button type="button" data-kstep="-2.5" aria-label="Menos 2,5 kg">−</button><input class="kg" inputmode="decimal" value="${kg0 != null ? fmtNum(kg0, 2) : ""}" placeholder="${isBodyweight(r.ex) ? "0" : "kg"}" aria-label="Peso"><button type="button" data-kstep="2.5" aria-label="Más 2,5 kg">+</button></div></div>
+            <div class="pk"><span>Reps</span><div class="stepper"><button type="button" data-rstep="-1" aria-label="Una rep menos">−</button><input class="reps" inputmode="numeric" value="${reps0 ?? ""}" placeholder="reps" aria-label="Repeticiones"><button type="button" data-rstep="1" aria-label="Una rep más">+</button></div></div>
           </div>
+          <div class="schips">${Array.from({ length: n }, (_, i) => setChip(i, saved[i])).join("")}<button type="button" class="sc add" data-act="add" aria-label="Añadir serie">+</button></div>
         </div>`;
       }).join("")}
       <div class="block-total"></div>
     </div>`;
   }
 
-  function setRow(i, saved, reps) {
-    const done = saved ? "done" : "";
-    return `<div class="set ${done}">
-      <span class="set-n">${i + 1}</span>
-      <div class="stepper"><button type="button" data-step="-2.5" aria-label="Menos 2,5 kg">−</button><input class="kg" inputmode="decimal" value="${saved?.kg ?? ""}" aria-label="Kg serie ${i + 1}"><button type="button" data-step="2.5" aria-label="Más 2,5 kg">+</button></div>
-      <input class="reps" inputmode="numeric" value="${saved?.reps ?? ""}" placeholder="${reps ?? "reps"}" aria-label="Reps serie ${i + 1}">
-      <button type="button" class="tick" aria-label="Serie hecha">${ico("check")}</button>
-    </div>`;
+  // Ficha de una serie: vacía (pendiente) o hecha con su peso × reps
+  function setChip(i, saved) {
+    const d = saved ? ` data-kg="${saved.kg ?? ""}" data-reps="${saved.reps ?? ""}"` : "";
+    return `<button type="button" class="sc ${saved ? "done" : ""}"${d}><b>${i + 1}</b><small>${saved ? chipTxt(saved) : "serie"}</small></button>`;
   }
+  const chipTxt = (x) => `${x.kg != null ? kgStr(x.kg) : "PC"}×${x.reps ?? "?"}`;
 
-  // Lógica interactiva de las series (placeholders encadenados, ✓, +/−, totales)
-  function bindSets(root) {
-    const num0 = (v) => { const n = num(v); return n == null ? null : n; };
+  // Lógica de las fichas: tocar = serie hecha con el peso y reps del selector; tocar otra vez = deshacer
+  function bindSets(root, onChange) {
     const refresh = (ex) => {
-      const base = num0(ex.dataset.base);
-      let carry = base;
-      const rows = [...ex.querySelectorAll(".set")];
-      rows.forEach((row) => {
-        const kg = row.querySelector(".kg");
-        kg.placeholder = carry != null ? fmtNum(carry, 2) : "kg";
-        const v = num0(kg.value);
-        if (v != null) carry = v;
-      });
       const sets = readSets(ex);
       const st = setsStats(sets);
-      ex.querySelector(".exlog-stat").innerHTML = sets.length ? `${sets.length} × · <b>${fmtNum(st.vol, 0)}</b> kg${st.best ? ` · 1RM ~${fmtNum(st.best, 0)}` : ""}` : "";
+      ex.querySelector(".exlog-stat").innerHTML = sets.length ? `${sets.length} × · <b>${fmtNum(st.vol, 0)}</b> kg` : "";
       const block = ex.closest(".strength");
       let tv = 0, ts = 0;
       block.querySelectorAll(".exlog").forEach((e) => { const ss = readSets(e); ts += ss.length; tv += setsStats(ss).vol; });
@@ -566,59 +554,51 @@
     };
     root.querySelectorAll(".exlog").forEach((ex) => {
       refresh(ex);
-      ex.addEventListener("input", () => {
-        ex.querySelectorAll(".set").forEach((row) => row.classList.toggle("done", !!(row.querySelector(".kg").value || row.querySelector(".reps").value) || row.classList.contains("ticked")));
-        refresh(ex);
-      });
       ex.addEventListener("click", (e) => {
         const b = e.target.closest("button"); if (!b) return;
-        const row = b.closest(".set");
-        if (b.dataset.step && row) {
-          const kg = row.querySelector(".kg");
-          const cur = num0(kg.value) ?? num0(kg.placeholder) ?? 0;
-          kg.value = fmtNum(Math.max(0, cur + Number(b.dataset.step)), 2);
-          row.classList.add("done");
-        } else if (b.classList.contains("tick") && row) {
-          const kg = row.querySelector(".kg"), reps = row.querySelector(".reps");
-          if (row.classList.contains("done")) { kg.value = ""; reps.value = ""; row.classList.remove("done", "ticked"); }
-          else {
-            if (!kg.value && num0(kg.placeholder) != null) kg.value = kg.placeholder;
-            if (!reps.value && num0(reps.placeholder) != null) reps.value = reps.placeholder;
-            row.classList.add("done", "ticked");
-          }
-        } else if (b.dataset.act === "add") {
-          const sets = ex.querySelector(".sets");
-          const n = sets.children.length;
-          sets.insertAdjacentHTML("beforeend", setRow(n, null, num0(ex.dataset.reps)));
-        } else if (b.dataset.act === "repeat") {
-          const prev = lastSets(ex.dataset.ex, ex.closest("form").dataset.date);
-          const sets = ex.querySelector(".sets");
-          while (sets.children.length < prev.sets.length) sets.insertAdjacentHTML("beforeend", setRow(sets.children.length, null, num0(ex.dataset.reps)));
-          [...sets.children].forEach((row, i) => { const p = prev.sets[i]; if (!p) return;
-            row.querySelector(".kg").value = p.kg != null ? fmtNum(p.kg, 2) : ""; row.querySelector(".reps").value = p.reps ?? ""; row.classList.add("done"); });
-        } else if (b.dataset.act === "suggest") {
-          ex.querySelectorAll(".set").forEach((row) => { row.querySelector(".kg").value = fmtNum(Number(b.dataset.kg), 2); row.classList.add("done"); });
+        const kg = ex.querySelector(".kg"), reps = ex.querySelector(".reps");
+        if (b.dataset.kstep) { kg.value = fmtNum(Math.max(0, (num(kg.value) ?? 0) + Number(b.dataset.kstep)), 2); return; }
+        if (b.dataset.rstep) { reps.value = Math.max(0, (num(reps.value) ?? num(ex.dataset.reps) ?? 0) + Number(b.dataset.rstep)); return; }
+        if (b.dataset.act === "add") {
+          const n = ex.querySelectorAll(".sc:not(.add)").length;
+          b.insertAdjacentHTML("beforebegin", setChip(n, null));
+          return;
+        }
+        if (!b.classList.contains("sc")) return;
+        if (b.classList.contains("done")) {
+          b.classList.remove("done"); delete b.dataset.kg; delete b.dataset.reps; b.querySelector("small").textContent = "serie";
+        } else {
+          const x = { kg: num(kg.value), reps: num(reps.value) ?? num(ex.dataset.reps) };
+          b.dataset.kg = x.kg ?? ""; b.dataset.reps = x.reps ?? "";
+          b.classList.add("done"); b.querySelector("small").textContent = chipTxt(x);
+          if (navigator.vibrate) navigator.vibrate(15);
         }
         refresh(ex);
+        if (onChange) onChange();
       });
     });
   }
 
-  // Lee las series marcadas: kg vacío = hereda el de la serie anterior; reps vacías = las del plan
+  // Lee las series hechas (fichas marcadas)
   function readSets(ex) {
-    const out = [];
-    let carry = num(ex.dataset.base);
-    const target = num(ex.dataset.reps);
-    ex.querySelectorAll(".set").forEach((row) => {
-      const kgV = num(row.querySelector(".kg").value), repsV = num(row.querySelector(".reps").value);
-      if (kgV != null) carry = kgV;
-      if (!row.classList.contains("done")) return;
-      const reps = repsV ?? target;
-      const kg = kgV ?? carry;
-      if (reps == null && kg == null) return;
-      out.push({ kg: kg ?? null, reps: reps ?? null });
+    return [...ex.querySelectorAll(".sc.done")].map((c) => ({ kg: num(c.dataset.kg), reps: num(c.dataset.reps) }));
+  }
+
+  // Texto para Strava («¿Qué entrenamiento hiciste?»): ejercicio: N series x R repeticiones con K kg
+  function stravaText(s, form) {
+    const lines = [];
+    form.querySelectorAll(".exlog").forEach((ex) => {
+      const name = ex.dataset.ex;
+      let sets = readSets(ex);
+      if (!sets.length) return;
+      const groups = [];
+      sets.forEach((x) => { const g = groups[groups.length - 1]; if (g && g.kg === x.kg && g.reps === x.reps) g.n++; else groups.push({ ...x, n: 1 }); });
+      const per = isDumbbell(name) ? " por mancuerna" : "";
+      lines.push(`${name}: ${groups.map((g) => `${g.n} ${g.n === 1 ? "serie" : "series"}${g.reps != null ? ` x ${g.reps} repeticiones` : ""}${g.kg ? ` con ${kgStr(g.kg)} kg${per}` : isBodyweight(name) ? " con peso corporal" : ""}`).join(", ")}`);
     });
-    return out;
+    const fx = Object.values(FX).find((f) => s.detail.includes(f));
+    if (fx && lines.length) lines.push(fx);
+    return lines.join("\n");
   }
 
   // ——— Sesión ———
@@ -637,6 +617,14 @@
       <form id="logForm" class="card form" autocomplete="off" data-date="${s.date}">
         <div class="eyebrow">Registro</div><h2>¿Cómo ha ido?</h2>
         ${s.strength.map((k) => strengthBlock(k, s.week, s.id, true)).join("")}
+        ${s.strength.length ? `<div class="stravabox">
+          <div class="row-between"><label for="stravaTxt">Para pegar en Strava</label><button type="button" class="chip-btn" id="cpStrava">${ico("copy")} Copiar</button></div>
+          <textarea id="stravaTxt" rows="5" readonly placeholder="Marca las series hechas y aquí aparecerá el texto."></textarea>
+          <p class="muted tiny">En Strava: «¿Qué entrenamiento hiciste?» → pegar.</p>
+        </div>` : ""}
+        ${hasRun ? `<div class="stravarun" id="stravaRun">${Strava.connected()
+          ? `<button type="button" class="btn ghost" id="stravaImp">↓ Traer la carrera de Strava</button><span class="muted tiny" id="stravaMsg"></span>`
+          : `<span class="muted tiny">Conecta Strava en <a class="link" href="#/datos">Datos</a> para rellenar la carrera sola.</span>`}</div>` : ""}
         <label>Estado</label>
         ${seg("status", [["done", "Hecha"], ["partial", "Parcial"], ["skipped", "No hecha"]], log.status || "")}
         <label>Semáforo de fatiga (antes de entrenar)</label>
@@ -666,7 +654,46 @@
       </form>
     `;
     const form = $("#logForm");
-    bindSets(form);
+    const stx = $("#stravaTxt");
+    const paintStrava = () => { if (stx) stx.value = stravaText(s, form); };
+    // Autoguardado de las series al marcarlas (no se pierden si sales de la pantalla)
+    const autosave = () => {
+      paintStrava();
+      const cur = Store.getLog(id) || {};
+      const sets = {}, loads = { ...(cur.loads || {}) };
+      form.querySelectorAll(".exlog").forEach((ex) => { const ss = readSets(ex); if (ss.length) { sets[ex.dataset.ex] = ss; loads[ex.dataset.ex] = setsSummary(ss); } else if (cur.sets?.[ex.dataset.ex]) delete loads[ex.dataset.ex]; });
+      if (!Object.keys(sets).length && !cur.status) { if (Store.getLog(id)) Store.deleteLog(id); return; }
+      Store.setLog(id, { week: s.week, date: s.date, title: s.title, ...cur, status: cur.status || "partial", sets, loads });
+    };
+    bindSets(form, autosave);
+    paintStrava();
+    if ($("#cpStrava")) $("#cpStrava").onclick = () => { if (!stx.value) { toast("Aún no has marcado ninguna serie"); return; } copy(stx.value, $("#cpStrava")); };
+    // Carrera desde Strava: se rellena sola al abrir si aún no hay km, o con el botón
+    const impBtn = $("#stravaImp");
+    const importRun = async (auto) => {
+      const msg = $("#stravaMsg");
+      msg.textContent = "Buscando en Strava…";
+      try {
+        const r = await Strava.runSummary(s.date);
+        if (!r) { msg.textContent = "No hay carreras en Strava ese día."; return; }
+        const setv = (n, v) => { const el = form.elements[n]; if (el && v != null && v !== "" && (!auto || !el.value)) el.value = v; };
+        setv("km", fmtNum(r.km, 2));
+        setv("pace", r.pace);
+        setv("hr", r.hr ?? "");
+        setv("hrmax", r.hrmax ?? "");
+        setv("splits", r.splits);
+        if (["run", "test", "race"].includes(s.kind)) setv("minutes", r.minutes);
+        const mk = { test5k: ["t5k", r.best5k, "t5k_hr"], test10k: ["t10k", r.best10k, "t10k_hr"], race10k: ["race10k", r.best10k, "race_hr"] }[s.metrics];
+        if (mk) { const t = form.querySelector(`[data-metric="${mk[0]}"]`), h = form.querySelector(`[data-metric="${mk[2]}"]`);
+          if (t && mk[1] && (!auto || !t.value)) t.value = mk[1]; if (h && r.hr && (!auto || !h.value)) h.value = r.hr; }
+        if (s.kind !== "hybrid" && !form.querySelector('.seg[data-name="status"] .on')) form.querySelector('.seg[data-name="status"] [data-v="done"]').classList.add("on");
+        msg.innerHTML = `✓ ${esc(r.names)} · revisa y pulsa <b>Guardar</b>`;
+      } catch (err) { msg.textContent = "No se pudo leer Strava: " + err.message; }
+    };
+    if (impBtn) {
+      impBtn.onclick = () => importRun(false);
+      if (!log.km && s.date <= todayISO()) importRun(true);
+    }
     form.querySelectorAll(".seg").forEach((g) => g.addEventListener("click", (e) => {
       const b = e.target.closest("button"); if (!b) return;
       const was = b.classList.contains("on");
@@ -693,7 +720,7 @@
         if (sets.length) { data.sets[name] = sets; data.loads[name] = setsSummary(sets); }
         else if (log.loads?.[name] && !log.sets?.[name]) data.loads[name] = log.loads[name]; // conserva anotaciones antiguas
       });
-      Store.setLog(id, data);
+      Store.setLog(id, { ...(Store.getLog(id) || {}), ...data });
       toast("Sesión guardada ✓");
       route();
     });
@@ -1460,6 +1487,7 @@
         <div class="actions"><button class="btn primary" id="exp">Exportar copia (.json)</button><label class="btn" for="imp">Importar copia</label><input type="file" id="imp" accept=".json,application/json" hidden></div>
         <div class="actions"><button class="btn ghost" id="copyAll">${ico("copy")} Copiar todos los datos (JSON)</button></div>
       </section>
+      ${stravaCard()}
       <section class="card"><h2>Apariencia</h2>
         <div class="seg" id="themeSeg">${[["auto", "Automático"], ["light", "Claro"], ["dark", "Oscuro"]].map(([v, l]) => `<button data-v="${v}" class="${theme === v ? "on" : ""}">${l}</button>`).join("")}</div></section>
       <section class="card"><h2>Ritmo objetivo</h2><p class="muted">Lo decide el test de 10 km de la semana 10.</p>
@@ -1484,9 +1512,43 @@
       } catch (err) { alert("No se pudo importar: " + err.message); }
     };
     $("#copyAll").onclick = () => copy(Store.exportJSON(), $("#copyAll"));
+    bindStravaCard();
     $("#themeSeg").onclick = (e) => { const b = e.target.closest("button"); if (!b) return; Store.setSetting("theme", b.dataset.v); applyTheme(); viewDatos(); };
     $("#tgSeg2").onclick = (e) => { const b = e.target.closest("button"); if (!b) return; Store.setSetting("activeTarget", b.dataset.v); viewDatos(); toast(`Ritmo objetivo ${b.dataset.v} activo`); };
     $("#reset").onclick = () => { if (confirm("¿Seguro? Se borrarán todos los registros de este navegador.") && confirm("Última confirmación: no se puede deshacer.")) { Store.reset(); toast("Registros borrados"); route(); } };
+  }
+
+  // ——— Strava ———
+  function stravaCard() {
+    const c = Strava.get();
+    if (Strava.connected()) return `<section class="card"><h2>Strava</h2>
+      <p>✓ Conectado${c.athlete ? ` como <b>${esc(c.athlete)}</b>` : ""}. Al abrir una sesión con carrera, se rellenan solos km, ritmo, FC y parciales.</p>
+      <div class="actions"><button class="btn ghost" id="stKey">${ico("copy")} Copiar clave de conexión</button><button class="btn danger" id="stOff">Desconectar</button></div>
+      <p class="muted tiny">La clave sirve para conectar la app instalada en el iPhone si la conexión se hizo en Safari: pégala abajo en la otra. No la compartas.</p></section>`;
+    return `<section class="card"><h2>Strava</h2>
+      <p class="muted">Para que las carreras se rellenen solas. Se hace una vez:</p>
+      <ol class="steps tiny">
+        <li>Entra en <b>strava.com/settings/api</b> y crea una app (nombre: el que quieras; web: <b>${esc(location.origin)}</b>; dominio de la devolución: <b>${esc(location.hostname)}</b>).</li>
+        <li>Copia aquí su <b>Client ID</b> y su <b>Client Secret</b> y pulsa Conectar.</li>
+      </ol>
+      <div class="grid2"><div><label for="stId">Client ID</label><input id="stId" inputmode="numeric" value="${esc(c.id || "")}"></div>
+      <div><label for="stSec">Client Secret</label><input id="stSec" type="password" value="${esc(c.secret || "")}"></div></div>
+      <div class="actions"><button class="btn primary" id="stGo">Conectar con Strava</button></div>
+      <details class="mt"><summary>¿Ya lo conectaste en otro sitio? Pega la clave</summary>
+        <input id="stPaste" placeholder="Clave de conexión"><div class="actions"><button class="btn" id="stUse">Usar clave</button></div></details>
+      <p class="muted tiny">Todo se guarda solo en este dispositivo; no va en las copias de seguridad.</p></section>`;
+  }
+  function bindStravaCard() {
+    const on = (sel, fn) => { const el = $(sel); if (el) el.onclick = fn; };
+    on("#stGo", () => {
+      const id = $("#stId").value.trim(), secret = $("#stSec").value.trim();
+      if (!id || !secret) { toast("Rellena Client ID y Client Secret"); return; }
+      Strava.set({ id, secret });
+      location.href = Strava.authorizeUrl();
+    });
+    on("#stUse", () => { try { Strava.useKey($("#stPaste").value); toast("Strava conectado ✓"); viewDatos(); } catch { toast("Esa clave no es válida"); } });
+    on("#stKey", () => copy(Strava.key(), $("#stKey")));
+    on("#stOff", () => { if (confirm("¿Desconectar Strava de este dispositivo?")) { Strava.disconnect(); viewDatos(); } });
   }
 
   // ——— helpers UI ———
@@ -1527,6 +1589,10 @@
   }
   window.addEventListener("hashchange", () => { route(); window.scrollTo(0, 0); });
   applyTheme();
+  if (new URLSearchParams(location.search).get("state") === "strava") {
+    location.hash = "#/datos";
+    Strava.handleRedirect().then((r) => { toast(r.ok ? "Strava conectado ✓" : r.msg); route(); }).catch((e) => { toast("Error con Strava: " + e.message); route(); });
+  }
   route();
 
   // Service worker: busca versión nueva al abrir o volver a la app y recarga sola cuando la hay
