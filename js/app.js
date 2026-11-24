@@ -271,6 +271,12 @@
     "Zancada búlgara (mancuernas)": ["Bulgara", "Bulgara"], "Hip thrust": ["Hip thrust", "Hip thr"],
     "Curl femoral": ["Curl femoral", "Femoral"], "Gemelo sentado": ["Gemelo sent", "Gem sent"], "Elevación de piernas colgado": ["Elev piernas", "Elev pier"],
   };
+  // Descanso entre series: básicos pesados 3', multiarticulares 2', aislamiento 90" o 60"
+  const REST_RULES = [[/sentadilla trasera|peso muerto convencional|press banca/i, "3m"],
+    [/dominadas|press militar|remo con barra|press inclinado|jalón|remo en polea|fondos|prensa|rumano|búlgara|hip thrust/i, "2m"],
+    [/extensión de cuádriceps|curl femoral|curl con barra|press francés|curl inclinado|aperturas/i, "90s"]];
+  const restFor = (ex) => (REST_RULES.find(([re]) => re.test(ex)) || [, "60s"])[1];
+  const restLabel = (r) => r.replace("m", "'").replace("s", "\"");
   // Finishers en una línea
   const FX_SHORT = { base1: "Fx 3r remo/KB/farmers", base2: "Fx 4x sled 25m+10 WB", des1: "Fx EMOM12 remo/KB/farm", des2: "Fx AMRAP12 ski/burp/WB",
     esp1: "Fx 5x ski 10+8 thrust", esp2: "Fx 4x sled+sandbag", afi1: "Fx 4x remo200+10 KB", core: "Core plank/Pallof/bug" };
@@ -279,12 +285,12 @@
     const sets = watchTxt((m ? m[1] : v).replace(/\/pierna/, "/p").replace(/máx/i, "max"));
     return { sets, rir: m ? "R" + watchTxt(m[2]) : "" };
   };
-  // Línea de un ejercicio: «Sentadilla 4x6-8 R2 85». Si no cabe, quita el RIR y luego acorta el nombre.
+  // Línea de un ejercicio: «Sentadilla 4x6-8 R2 85 3m» (kg y descanso). Si no cabe, quita el RIR y luego acorta el nombre.
   function exLine(ex, v, kg) {
     const [long, short] = EX_SHORT[ex] || [shortEx(ex), shortEx(ex)];
     const { sets, rir } = schemeParts(v);
-    const k = kg != null ? kgStr(kg) : "";
-    const opts = [[long, sets, rir, k], [long, sets, k], [short, sets, rir, k], [short, sets, k]].map((x) => x.filter(Boolean).join(" "));
+    const k = kg != null ? kgStr(kg) : "", d = restFor(ex);
+    const opts = [[long, sets, rir, k, d], [long, sets, k, d], [short, sets, rir, k, d], [short, sets, k, d], [short, sets, k]].map((x) => x.filter(Boolean).join(" "));
     return opts.find((x) => x.length <= WATCH_W) || opts[opts.length - 1];
   }
   function watchLines(s) {
@@ -311,7 +317,7 @@
     const text = lines.join("|"), maxW = Math.max(...lines.map((l) => l.length));
     const warn = lines.length > WATCH_LINES || maxW > WATCH_W;
     return `<details class="watch"><summary>⌚ Nota para el reloj</summary>
-      <p class="muted tiny">Ejercicio, series, RIR (R) y kg sugeridos cuando ya tienes cargas registradas. Pégala en <b>Note 1</b> de la app Notes (SuuntoPlus).</p>
+      <p class="muted tiny">Ejercicio, series, RIR (R), kg sugeridos (si ya tienes cargas registradas) y descanso entre series (3m, 2m, 90s, 60s). Pégala en <b>Note 1</b> de la app Notes (SuuntoPlus).</p>
       <div class="wnote"><div class="wnote-h"><b>Note 1</b><span class="${warn ? "warn" : ""}">${lines.length}/${WATCH_LINES} líneas · ${maxW}/${WATCH_W} car.</span><button type="button" class="chip-btn" data-copy-note="${esc(text)}">Copiar</button></div>
         <div class="wnote-p">${lines.map(esc).join("<br>")}</div></div>
     </details>`;
@@ -520,7 +526,7 @@
         const reps0 = last?.reps ?? scheme.reps ?? prev?.sets?.[0]?.reps ?? null;
         const unit = isDumbbell(r.ex) ? "kg/manc." : isBodyweight(r.ex) ? "lastre kg" : "kg";
         return `<div class="exlog" data-ex="${esc(r.ex)}" data-reps="${scheme.reps ?? ""}">
-          <div class="exlog-head"><div class="ex-name">${esc(r.ex)}<small class="target">${esc(r.values[ci])}</small></div><span class="exlog-stat"></span></div>
+          <div class="exlog-head"><div class="ex-name">${esc(r.ex)}<small class="target">${esc(r.values[ci])} · descanso ${restLabel(restFor(r.ex))}</small></div><span class="exlog-stat"></span></div>
           ${prev ? `<div class="exlog-prev">Última · ${fmtDate(prev.date)}: <b>${esc(prev.text)}</b>${sug?.up ? ` · <span class="up">↑ toca subir</span>` : ""}</div>` : ""}
           ${!saved.length && log?.loads?.[r.ex] ? `<div class="exlog-prev">Anotado: <b>${esc(log.loads[r.ex])}</b></div>` : ""}
           <div class="pick">
