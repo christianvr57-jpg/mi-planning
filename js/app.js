@@ -270,7 +270,13 @@
     const lines = [];
     (s.strength || []).forEach((k) => {
       const ci = STRENGTH[k].weekCol[s.week];
-      STRENGTH[k].rows.forEach((r) => { if (parseScheme(r.values[ci])) lines.push(`${EX_SHORT[r.ex] || shortEx(r.ex)} ${schemeShort(r.values[ci])}`); });
+      STRENGTH[k].rows.forEach((r) => {
+        const sc = parseScheme(r.values[ci]);
+        if (!sc) return;
+        // kg sugeridos (o los de la última vez) si hay registros previos
+        const sug = suggestKg(k, sc, lastSets(r.ex, s.date));
+        lines.push(`${EX_SHORT[r.ex] || shortEx(r.ex)} ${schemeShort(r.values[ci])}${sug ? " " + kgStr(sug.kg) : ""}`);
+      });
     });
     if (!lines.length) return watchNotes(s).map((n) => n.text).join("|"); // días solo de carrera
     return lines.join("|");
@@ -279,7 +285,7 @@
     const text = watchNote(s);
     if (!text) return "";
     return `<details class="watch"><summary>⌚ Nota para el reloj</summary>
-      <p class="muted tiny">Ejercicios y series en una sola línea. Pégala en <b>Note 1</b> de la app Notes (SuuntoPlus): cada «|» es un salto de línea en el reloj.</p>
+      <p class="muted tiny">Ejercicio, series y kg sugeridos (cuando ya tienes cargas registradas) en una sola línea. Pégala en <b>Note 1</b> de la app Notes (SuuntoPlus): cada «|» es un salto de línea en el reloj.</p>
       <div class="wnote"><div class="wnote-h"><b>Note 1</b><span>${text.length} caracteres</span><button type="button" class="chip-btn" data-copy-note="${esc(text)}">Copiar</button></div>
         <div class="wnote-p">${esc(text)}</div></div>
     </details>`;
@@ -1497,5 +1503,14 @@
   applyTheme();
   route();
 
-  if ("serviceWorker" in navigator && location.protocol === "https:") navigator.serviceWorker.register("sw.js").catch(() => {});
+  // Service worker: busca versión nueva al abrir o volver a la app y recarga sola cuando la hay
+  if ("serviceWorker" in navigator && location.protocol === "https:") {
+    const hadSW = !!navigator.serviceWorker.controller;
+    let reloading = false;
+    navigator.serviceWorker.addEventListener("controllerchange", () => { if (hadSW && !reloading) { reloading = true; location.reload(); } });
+    navigator.serviceWorker.register("sw.js", { updateViaCache: "none" }).then((reg) => {
+      reg.update().catch(() => {});
+      document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") reg.update().catch(() => {}); });
+    }).catch(() => {});
+  }
 })();
