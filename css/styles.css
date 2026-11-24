@@ -649,3 +649,4 @@ body.noscroll { overflow: hidden; }
 .wnote-h b { white-space: nowrap; }
 .wnote-h span { color: var(--muted); font-size: .85rem; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .wnote-p { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .8rem; line-height: 1.45; margin-top: 6px; color: var(--text); }
+.wnote-p { overflow-wrap: anywhere; }

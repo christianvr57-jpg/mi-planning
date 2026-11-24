@@ -204,7 +204,7 @@
   }
 
   // ——— Notas para el reloj (SuuntoPlus Notes: hasta 10 notas, "|" = salto de línea) ———
-  const watchTxt = (x) => String(x).replace(/×/g, "x").replace(/[–—−]/g, "-").replace(/[“”″]/g, '"').replace(/[‘’′]/g, "'").replace(/\|/g, "/").replace(/\s+/g, " ").trim();
+  const watchTxt = (x) => String(x).replace(/×/g, "x").replace(/[–—−]/g, "-").replace(/≈/g, "~").replace(/[“”″]/g, '"').replace(/[‘’′]/g, "'").replace(/\|/g, "/").replace(/\s+/g, " ").trim();
   const shortEx = (ex) => ex.replace(/\s*\(.*?\)\s*/g, " ").trim();
   function watchNotes(s) {
     if (!s || s.kind === "rest") return [];
@@ -240,7 +240,7 @@
       rows.forEach((r, i) => {
         const prev = lastSets(r.ex, s.date);
         const sug = suggestKg(k, parseScheme(r.values[ci]), prev);
-        const lines = [`${k} ${i + 1}/${rows.length}`, shortEx(r.ex), r.values[ci]];
+        const lines = [`${i + 1}/${rows.length} ${shortEx(r.ex)}`, r.values[ci]];
         if (sug) lines.push(`Hoy: ${kgStr(sug.kg)} kg${sug.up ? " (sube)" : ""}`);
         if (prev) lines.push(`Ult: ${prev.text}`);
         notes.splice(notes.length, 0, { title: shortEx(r.ex), text: lines.map(watchTxt).join("|"), ex: true });
@@ -249,20 +249,21 @@
     // Orden: carrera, ejercicios, extras (funcional, core…) al final
     const order = (n) => (n.title.startsWith("Carrera") ? 0 : n.ex ? 1 : 2);
     notes.sort((a, b) => order(a) - order(b));
-    // La app admite 10 notas: si sobran, se juntan en la última
-    if (notes.length > 10) {
-      const rest = notes.splice(9);
-      notes.push({ title: "Resto", text: rest.map((n) => n.text).join("|") });
-    }
     return notes;
   }
-  function watchNotesHtml(s) {
+  // Todo el entreno en una sola nota, en una línea, separada por "|"
+  function watchNote(s) {
     const notes = watchNotes(s);
     if (!notes.length) return "";
-    return `<details class="watch"><summary>⌚ Notas para el reloj <small>${notes.length} nota${notes.length > 1 ? "s" : ""}</small></summary>
-      <p class="muted tiny">Copia cada una y pégala en <b>Note 1, Note 2…</b> de la app Notes (SuuntoPlus). La barra «|» es un salto de línea en el reloj.</p>
-      ${notes.map((n, i) => `<div class="wnote"><div class="wnote-h"><b>Note ${i + 1}</b><span>${esc(n.title)}</span><button type="button" class="chip-btn" data-copy-note="${esc(n.text)}">Copiar</button></div>
-        <div class="wnote-p">${n.text.split("|").map(esc).join("<br>")}</div></div>`).join("")}
+    return [watchTxt(`${s.day} - ${s.title}`), ...notes.map((n) => n.text)].join("|");
+  }
+  function watchNotesHtml(s) {
+    const text = watchNote(s);
+    if (!text) return "";
+    return `<details class="watch"><summary>⌚ Nota para el reloj</summary>
+      <p class="muted tiny">Todo el entreno en una sola nota de una línea. Pégala en <b>Note 1</b> de la app Notes (SuuntoPlus): cada «|» es un salto de línea en el reloj.</p>
+      <div class="wnote"><div class="wnote-h"><b>Note 1</b><span>${text.length} caracteres</span><button type="button" class="chip-btn" data-copy-note="${esc(text)}">Copiar</button></div>
+        <div class="wnote-p">${esc(text)}</div></div>
     </details>`;
   }
   document.addEventListener("click", (e) => {
