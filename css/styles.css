@@ -1,61 +1,61 @@
-/* ============ Tokens ============ */
+/* ============ Tokens (estilo iOS) ============ */
 :root {
   color-scheme: light;
-  --bg: #f3f4f8;
-  --bg-glow: radial-gradient(1200px 500px at 85% -10%, rgba(91, 76, 240, .10), transparent 60%), radial-gradient(900px 400px at -10% 10%, rgba(14, 165, 201, .08), transparent 60%);
+  --bg: #f2f2f7;
+  --bg-glow: none;
   --surface: #ffffff;
-  --surface-2: #f1f2f7;
-  --surface-3: #e7e9f1;
-  --border: #e3e5ee;
-  --text: #10131a;
-  --text-2: #3f4656;
-  --muted: #7a8193;
-  --accent: #5b4cf0;
-  --accent-2: #0ea5c9;
+  --surface-2: #f2f2f7;
+  --surface-3: #e5e5ea;
+  --border: rgba(60, 60, 67, .12);
+  --text: #1d1d1f;
+  --text-2: #3a3a3c;
+  --muted: #8a8a8e;
+  --accent: #007aff;
+  --accent-2: #007aff;
   --accent-ink: #ffffff;
-  --accent-soft: rgba(91, 76, 240, .10);
-  --grad: linear-gradient(135deg, var(--accent), var(--accent-2));
-  --good: #12a36b; --warn: #d99a06; --bad: #e0424f;
-  --c-suave: #14b88f; --c-media: #e5a50a; --c-dura: #f2762b; --c-muy: #ea3d55; --c-max: #6d5cf5; --c-libre: #a3a8b6;
-  --k-run: #14b88f; --k-strength: #6d5cf5; --k-hybrid: #f2762b; --k-test: #0ea5c9; --k-sim: #ea3d55; --k-rest: #a3a8b6; --k-race: #5b4cf0;
-  --z1: #5aa9e6; --z2: #14b88f; --z3: #e5a50a; --z4: #f2762b; --z5: #ea3d55; --zro: #6d5cf5;
-  --series-plan: #d3d6e2; --series-real: #5b4cf0;
-  --radius: 20px;
+  --accent-soft: rgba(0, 122, 255, .10);
+  --grad: var(--accent);
+  --good: #34c759; --warn: #ff9f0a; --bad: #ff3b30;
+  --c-suave: #34c759; --c-media: #ffb300; --c-dura: #ff9500; --c-muy: #ff3b30; --c-max: #5856d6; --c-libre: #aeaeb2;
+  --k-run: #34c759; --k-strength: #5856d6; --k-hybrid: #ff9500; --k-test: #32ade6; --k-sim: #ff3b30; --k-rest: #aeaeb2; --k-race: #007aff;
+  --z1: #64d2ff; --z2: #34c759; --z3: #ffb300; --z4: #ff9500; --z5: #ff3b30; --zro: #5856d6;
+  --series-plan: #d1d1d6; --series-real: #007aff;
+  --radius: 22px;
   --radius-sm: 14px;
-  --shadow: 0 1px 2px rgba(16, 19, 26, .04), 0 8px 24px -12px rgba(16, 19, 26, .12);
-  --blur-bg: rgba(243, 244, 248, .78);
+  --shadow: none;
+  --blur-bg: rgba(242, 242, 247, .72);
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     color-scheme: dark;
-    --bg: #0c0e13;
-    --bg-glow: radial-gradient(1200px 520px at 85% -10%, rgba(139, 124, 255, .16), transparent 60%), radial-gradient(900px 420px at -10% 8%, rgba(34, 195, 238, .08), transparent 60%);
-    --surface: #151821; --surface-2: #1c2029; --surface-3: #252a36; --border: rgba(255, 255, 255, .07);
-    --text: #eef0f6; --text-2: #bcc2cf; --muted: #7d8598;
-    --accent: #8b7cff; --accent-2: #22c3ee; --accent-ink: #0c0e13; --accent-soft: rgba(139, 124, 255, .14);
-    --good: #34d399; --warn: #fbbf24; --bad: #fb6b7b;
-    --c-suave: #2dd4a7; --c-media: #fbbf24; --c-dura: #fb8a3c; --c-muy: #fb5a70; --c-max: #8b7cff; --c-libre: #5f6678;
-    --k-run: #2dd4a7; --k-strength: #8b7cff; --k-hybrid: #fb8a3c; --k-test: #22c3ee; --k-sim: #fb5a70; --k-rest: #5f6678; --k-race: #8b7cff;
-    --z1: #60a5fa; --z2: #2dd4a7; --z3: #fbbf24; --z4: #fb8a3c; --z5: #fb5a70; --zro: #8b7cff;
-    --series-plan: #323848; --series-real: #8b7cff;
-    --shadow: 0 1px 0 rgba(255, 255, 255, .03) inset, 0 10px 30px -18px rgba(0, 0, 0, .8);
-    --blur-bg: rgba(12, 14, 19, .78);
+    --bg: #000000;
+    --bg-glow: none;
+    --surface: #1c1c1e; --surface-2: #2c2c2e; --surface-3: #3a3a3c; --border: rgba(84, 84, 88, .36);
+    --text: #f5f5f7; --text-2: #d1d1d6; --muted: #8e8e93;
+    --accent: #0a84ff; --accent-2: #0a84ff; --accent-ink: #ffffff; --accent-soft: rgba(10, 132, 255, .16); --grad: var(--accent);
+    --good: #30d158; --warn: #ffd60a; --bad: #ff453a;
+    --c-suave: #30d158; --c-media: #ffd60a; --c-dura: #ff9f0a; --c-muy: #ff453a; --c-max: #5e5ce6; --c-libre: #636366;
+    --k-run: #30d158; --k-strength: #5e5ce6; --k-hybrid: #ff9f0a; --k-test: #64d2ff; --k-sim: #ff453a; --k-rest: #636366; --k-race: #0a84ff;
+    --z1: #64d2ff; --z2: #30d158; --z3: #ffd60a; --z4: #ff9f0a; --z5: #ff453a; --zro: #5e5ce6;
+    --series-plan: #3a3a3c; --series-real: #0a84ff;
+    --shadow: none;
+    --blur-bg: rgba(22, 22, 24, .72);
   }
 }
 :root[data-theme="dark"] {
-  color-scheme: dark;
-  --bg: #0c0e13;
-  --bg-glow: radial-gradient(1200px 520px at 85% -10%, rgba(139, 124, 255, .16), transparent 60%), radial-gradient(900px 420px at -10% 8%, rgba(34, 195, 238, .08), transparent 60%);
-  --surface: #151821; --surface-2: #1c2029; --surface-3: #252a36; --border: rgba(255, 255, 255, .07);
-  --text: #eef0f6; --text-2: #bcc2cf; --muted: #7d8598;
-  --accent: #8b7cff; --accent-2: #22c3ee; --accent-ink: #0c0e13; --accent-soft: rgba(139, 124, 255, .14);
-  --good: #34d399; --warn: #fbbf24; --bad: #fb6b7b;
-  --c-suave: #2dd4a7; --c-media: #fbbf24; --c-dura: #fb8a3c; --c-muy: #fb5a70; --c-max: #8b7cff; --c-libre: #5f6678;
-  --k-run: #2dd4a7; --k-strength: #8b7cff; --k-hybrid: #fb8a3c; --k-test: #22c3ee; --k-sim: #fb5a70; --k-rest: #5f6678; --k-race: #8b7cff;
-  --z1: #60a5fa; --z2: #2dd4a7; --z3: #fbbf24; --z4: #fb8a3c; --z5: #fb5a70; --zro: #8b7cff;
-  --series-plan: #323848; --series-real: #8b7cff;
-  --shadow: 0 1px 0 rgba(255, 255, 255, .03) inset, 0 10px 30px -18px rgba(0, 0, 0, .8);
-  --blur-bg: rgba(12, 14, 19, .78);
+    color-scheme: dark;
+    --bg: #000000;
+    --bg-glow: none;
+    --surface: #1c1c1e; --surface-2: #2c2c2e; --surface-3: #3a3a3c; --border: rgba(84, 84, 88, .36);
+    --text: #f5f5f7; --text-2: #d1d1d6; --muted: #8e8e93;
+    --accent: #0a84ff; --accent-2: #0a84ff; --accent-ink: #ffffff; --accent-soft: rgba(10, 132, 255, .16); --grad: var(--accent);
+    --good: #30d158; --warn: #ffd60a; --bad: #ff453a;
+    --c-suave: #30d158; --c-media: #ffd60a; --c-dura: #ff9f0a; --c-muy: #ff453a; --c-max: #5e5ce6; --c-libre: #636366;
+    --k-run: #30d158; --k-strength: #5e5ce6; --k-hybrid: #ff9f0a; --k-test: #64d2ff; --k-sim: #ff453a; --k-rest: #636366; --k-race: #0a84ff;
+    --z1: #64d2ff; --z2: #30d158; --z3: #ffd60a; --z4: #ff9f0a; --z5: #ff453a; --zro: #5e5ce6;
+    --series-plan: #3a3a3c; --series-real: #0a84ff;
+    --shadow: none;
+    --blur-bg: rgba(22, 22, 24, .72);
 }
 
 /* ============ Base ============ */
@@ -63,8 +63,8 @@
 html { -webkit-text-size-adjust: 100%; }
 body {
   margin: 0; background: var(--bg); background-image: var(--bg-glow); background-attachment: fixed; color: var(--text);
-  font: 15px/1.5 "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, system-ui, sans-serif;
-  font-feature-settings: "cv11", "ss01"; -webkit-font-smoothing: antialiased;
+  font: 16px/1.47 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", "Segoe UI", Roboto, system-ui, sans-serif;
+  letter-spacing: -.01em; -webkit-font-smoothing: antialiased;
   padding-bottom: calc(92px + env(safe-area-inset-bottom));
 }
 a { color: inherit; }
@@ -656,3 +656,62 @@ body.noscroll { overflow: hidden; }
 .wnote-p { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .8rem; line-height: 1.45; margin-top: 6px; color: var(--text); }
 .wnote-p { overflow-wrap: anywhere; }
 .wnote-h span.warn { color: var(--danger, #e5484d); }
+
+/* ============ Capa minimalista (inspiración Apple) ============ */
+h1, h2, h3 { font-weight: 700; letter-spacing: -.022em; }
+h2 { font-size: 1.2rem; }
+.display { font-size: 2.125rem; font-weight: 700; letter-spacing: -.03em; }
+.eyebrow, .section-title, .slot-h { font-weight: 600; letter-spacing: .02em; text-transform: none; font-size: .8rem; }
+.section-title { font-size: .95rem; color: var(--text); font-weight: 700; letter-spacing: -.01em; margin: 8px 4px 8px; }
+.wrap { gap: 16px; padding-top: 18px; }
+
+.topbar { background: var(--blur-bg); backdrop-filter: saturate(1.8) blur(20px); -webkit-backdrop-filter: saturate(1.8) blur(20px); border-bottom: .5px solid var(--border); }
+.logo { background: #000; box-shadow: none; border-radius: 10px; width: 34px; height: 34px; }
+.logo svg { width: 22px; height: 22px; }
+.brand b { font-weight: 700; }
+.iconbtn { background: transparent; color: var(--accent); }
+.ring-fg { stroke: var(--accent); }
+
+.tabbar { border: .5px solid var(--border); border-radius: 30px; box-shadow: 0 8px 30px -10px rgba(0, 0, 0, .25); padding: 5px; backdrop-filter: saturate(1.8) blur(24px); -webkit-backdrop-filter: saturate(1.8) blur(24px); }
+.tabbar a { font-weight: 500; font-size: .66rem; border-radius: 24px; }
+.tabbar a.on { color: var(--accent); background: var(--surface-3); background: color-mix(in srgb, var(--text) 7%, transparent); }
+
+.card, .hero, .weekhead, .scard, .exlog, .wnote, .sheet { border: 0; box-shadow: none; }
+.card, .hero, .weekhead { border-radius: var(--radius); padding: 20px; }
+.hero { background: var(--surface); }
+.hero::before, .weekhead::before { display: none; }
+.hero::after { height: 0; }
+.scard { border-radius: 18px; }
+.scard.is-today { box-shadow: inset 0 0 0 2px var(--accent); }
+.scard.st-done, .scard.st-partial { background: var(--surface); }
+.racecard { background: var(--surface); border: 0; box-shadow: none; }
+.rc-days b { background: none; -webkit-background-clip: initial; background-clip: initial; color: var(--text); font-weight: 700; }
+
+.btn { border: 0; background: var(--surface-2); font-weight: 600; border-radius: 999px; padding: 11px 18px; }
+.btn.primary { background: var(--accent); color: #fff; box-shadow: none; }
+.btn.ghost { background: color-mix(in srgb, var(--accent) 10%, transparent); color: var(--accent); }
+.btn.danger { background: color-mix(in srgb, var(--bad) 12%, transparent); color: var(--bad); border: 0; }
+.chip-btn, .catchips button, .catchips .chiplink, .unitchips button { border: 0; font-weight: 600; }
+.chiplink.on, .catchips button.on, .unitchips button.on { background: var(--text); color: var(--bg); }
+.pill { font-weight: 600; }
+
+input, textarea { border: 0; background: var(--surface-2); border-radius: 12px; }
+input:focus, textarea:focus { box-shadow: 0 0 0 2px var(--accent); }
+.seg { background: var(--surface-2); border: 0; }
+.seg button.on, .seg a.on { box-shadow: 0 1px 3px rgba(0, 0, 0, .12); }
+output { background: var(--accent); font-weight: 700; }
+.rpebar i { background: var(--accent); }
+.form .strength { background: var(--surface-2); border: 0; }
+.exlog { background: var(--surface); }
+.stepper { border: 0; background: var(--surface-2); }
+.stepper input, .sc b, .counter span, .amount input { font-weight: 700; }
+.sc { border: 1.5px solid var(--surface-3); }
+.sc.done { border-color: var(--good); }
+.fbadge { border-radius: 7px; font-weight: 700; }
+.toast { border-radius: 999px; font-weight: 600; }
+.stravabox { border: 0; background: color-mix(in srgb, #fc4c02 8%, var(--surface)); }
+.stravarun .btn { border: 0; background: color-mix(in srgb, #fc4c02 10%, transparent); }
+.wnote { background: var(--surface-2); }
+.danger-zone { border: 0; }
+.wh-top h1 { font-weight: 700; letter-spacing: -.03em; }
+.bigring b, .kcal-ring b, .goal-card b, .rc-days b, .wh-ring span, .ringbtn span, .scard-day b, .nm-ring span { font-weight: 700; }

@@ -125,7 +125,7 @@
       ["progreso", "Progreso", "M3 3v18h18M7 15l4-4 3 3 6-6"],
       ["guia", "Guía", "M4 19.5A2.5 2.5 0 0 1 6.5 17H20V3H6.5A2.5 2.5 0 0 0 4 5.5zM4 19.5A2.5 2.5 0 0 0 6.5 22H20v-5"]];
     $("#topbar").innerHTML = `
-      <a class="brand" href="#/hoy"><span class="logo"><svg viewBox="0 0 24 24"><path d="M2 13h4l3-8 4 14 3-9 2 3h4"/></svg></span>
+      <a class="brand" href="#/hoy"><span class="logo"><svg viewBox="0 0 512 512" style="stroke:#b8f550;stroke-width:44"><path d="M282 196 236 306M282 196 338 246 390 222M276 200 212 226 176 282M236 306 322 350 306 438M236 306 208 392 126 374"/><circle cx="318" cy="118" r="42" fill="#b8f550" stroke="none"/></svg></span>
         <span><b>Mi planning</b><small>Semana ${wn} de ${WEEKS.length} · ${PHASES[w.phase].name}</small></span></a>
       <a class="ringbtn" href="#/progreso" title="Plan completado: ${o.done} de ${o.total} sesiones">${ring(o.pct)}<span>${o.pct}%</span></a>
       <a class="iconbtn" href="#/datos" aria-label="Datos y copia de seguridad"><svg viewBox="0 0 24 24"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/></svg></a>`;
