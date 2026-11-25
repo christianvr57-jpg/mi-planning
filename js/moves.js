@@ -1,0 +1,102 @@
+// Movilidad para corredores (cadera, flexores, tobillo) y vídeos de referencia de los ejercicios.
+// img: carpeta de img/ex (fotos de free-exercise-db, dominio público) · fig: monigote animado de js/figs.js
+const MOVES = {
+  toe_sit: { name: "Sentado sobre los dedos", fig: "toe_sit", muscles: ["planta del pie", "dedos"],
+    cues: ["De rodillas, con los dedos de los pies doblados hacia ti, siéntate sobre los talones.", "Notarás la planta del pie. Si es mucho, apoya las manos delante y quita peso."] },
+  ankle_sit: { name: "Sentado sobre los tobillos", fig: "ankle_sit", muscles: ["tibial anterior", "empeine"],
+    cues: ["Empeines planos en el suelo y siéntate sobre los talones.", "Para más intensidad, levanta un poco las rodillas con las manos."] },
+  hip_flexor: { name: "Flexor de cadera de rodillas", img: "Kneeling_Hip_Flexor", muscles: ["psoas", "recto femoral"],
+    cues: ["Rodilla de atrás en el suelo y aprieta el glúteo de esa pierna.", "Lleva la cadera adelante y vuelve, sin arquear la lumbar."] },
+  wgs: { name: "El mejor estiramiento del mundo", img: "Worlds_Greatest_Stretch", muscles: ["flexores de cadera", "isquios", "espalda alta"],
+    cues: ["Zancada larga con las manos en el suelo.", "Codo hacia el tobillo por dentro, luego gira y sube ese brazo al techo."] },
+  hip9090: { name: "Cadera 90/90", fig: "hip9090", muscles: ["rotadores de cadera", "glúteos"],
+    cues: ["Sentado, pies más anchos que la cadera y rodillas dobladas.", "Deja caer las dos rodillas a un lado y luego al otro, con la espalda alta."] },
+  crab: { name: "Extensión en cangrejo", fig: "crab", muscles: ["flexores de cadera", "pecho", "hombro"],
+    cues: ["Sentado, manos detrás y pies apoyados.", "Sube la cadera y lleva un brazo por encima de la cabeza; alterna."] },
+  squat_ham: { name: "Sentadilla a isquios", fig: "squat_ham", muscles: ["isquiotibiales", "aductores", "tobillo"],
+    cues: ["Baja a sentadilla profunda y agarra la punta de los pies.", "Sin soltar, estira las piernas hasta notar los isquios y vuelve a bajar."] },
+  cossack: { name: "Sentadilla cosaca", fig: "cossack", muscles: ["aductores", "glúteos"],
+    cues: ["Pies muy abiertos. Baja hacia un lado con la otra pierna estirada y la punta hacia arriba.", "Talón de la pierna doblada en el suelo; alterna lados."] },
+  pigeon: { name: "Paloma", fig: "pigeon", muscles: ["glúteo", "piriforme"],
+    cues: ["Pierna de delante doblada y cruzada; la de atrás estirada.", "Espalda recta y luego inclínate hacia delante respirando lento."] },
+  calf_alt: { name: "Gemelos en V invertida", fig: "calf_alt", muscles: ["gemelos", "sóleo", "isquios"],
+    cues: ["Manos y pies en el suelo, cadera arriba.", "Baja un talón mientras doblas la otra rodilla; alterna como pedaleando."] },
+  leg_front: { name: "Balanceo adelante-atrás", fig: "leg_front", muscles: ["flexores de cadera", "isquios"],
+    cues: ["Una mano en la pared, tronco quieto.", "Balancea la pierna relajada, cada vez un poco más amplio."] },
+  leg_side: { name: "Balanceo lateral", fig: "leg_side", muscles: ["aductores", "glúteo medio"],
+    cues: ["De cara a la pared, con las manos apoyadas.", "Cruza la pierna por delante y ábrela hacia fuera."] },
+  hip_circles: { name: "Círculos de cadera", img: "Standing_Hip_Circles", muscles: ["cadera"],
+    cues: ["Sube la rodilla, ábrela hacia fuera y bájala dibujando un círculo.", "Luego en sentido contrario."] },
+  groiners: { name: "Zancada de escalador", img: "Groiners", muscles: ["aductores", "flexores de cadera"],
+    cues: ["Desde plancha, lleva un pie junto a la mano.", "Vuelve y cambia de pierna con ritmo."] },
+  lunge: { name: "Zancadas caminando", img: "Bodyweight_Walking_Lunge", muscles: ["cuádriceps", "glúteos"],
+    cues: ["Pasos largos, la rodilla de atrás casi al suelo.", "Tronco erguido."] },
+  bridge: { name: "Puente de glúteo", img: "Butt_Lift_Bridge", muscles: ["glúteos", "isquios"],
+    cues: ["Tumbado boca arriba con los pies apoyados.", "Sube la cadera apretando glúteos y aguanta 1\" arriba."] },
+  hip_flexor_st: { name: "Flexor de cadera en zancada", img: "Standing_Hip_Flexors", muscles: ["psoas", "recto femoral"],
+    cues: ["Zancada con la pierna de atrás estirada.", "Mete la pelvis y empuja la cadera adelante. Mantén."] },
+  calf_wall: { name: "Gemelo en la pared", img: "Calf_Stretch_Hands_Against_Wall", muscles: ["gemelos", "sóleo"],
+    cues: ["Manos en la pared, pierna de atrás estirada y talón al suelo.", "Al final, dobla un poco esa rodilla para el sóleo."] },
+  ham_seated: { name: "Isquios sentado", img: "Seated_Floor_Hamstring_Stretch", muscles: ["isquiotibiales"],
+    cues: ["Una pierna estirada y la otra doblada.", "Inclínate desde la cadera hacia el pie, con la espalda larga."] },
+  childs: { name: "Postura del niño", img: "Childs_Pose", muscles: ["espalda baja", "cadera"],
+    cues: ["De rodillas, siéntate atrás y estira los brazos.", "Respira lento y relaja."] },
+  ankle_circles: { name: "Círculos de tobillo", img: "Ankle_Circles", muscles: ["tobillo"],
+    cues: ["Apoya la punta y gira el tobillo despacio.", "En los dos sentidos."] },
+};
+
+// Rutinas. dose: { reps, secs, sides } (sides = por lado)
+const ROUTINES = [
+  { id: "cadera", name: "Cadera del corredor", min: 12, when: "Días de descanso o de fuerza", tone: "Movilidad completa de cadera, flexores y tobillos, como la del vídeo.",
+    items: [["toe_sit", { secs: 30 }], ["ankle_sit", { secs: 30 }], ["hip_flexor", { reps: 8, sides: true }], ["wgs", { reps: 8, sides: true }],
+      ["hip9090", { reps: 8, sides: true }], ["crab", { reps: 8 }], ["squat_ham", { reps: 8 }], ["cossack", { reps: 8, sides: true }],
+      ["pigeon", { secs: 30, sides: true }], ["calf_alt", { reps: 8, sides: true }]] },
+  { id: "pre", name: "Antes de correr", min: 6, when: "Calentamiento de cada carrera", tone: "Dinámica: soltar cadera y tobillos sin estirar en estático.",
+    items: [["leg_front", { reps: 10, sides: true }], ["leg_side", { reps: 10, sides: true }], ["hip_circles", { reps: 6, sides: true }],
+      ["groiners", { reps: 6, sides: true }], ["lunge", { reps: 6, sides: true }], ["bridge", { reps: 10 }], ["ankle_circles", { reps: 10, sides: true }]] },
+  { id: "post", name: "Después de correr", min: 8, when: "Al acabar cada carrera", tone: "Estática y suave: flexores, gemelos, isquios y glúteo.",
+    items: [["hip_flexor_st", { secs: 40, sides: true }], ["calf_wall", { secs: 40, sides: true }], ["ham_seated", { secs: 40, sides: true }],
+      ["pigeon", { secs: 40, sides: true }], ["childs", { secs: 45 }]] },
+];
+
+// Ejercicios de gimnasio → foto animada y músculos
+const GYM_MEDIA = {
+  "Press banca con barra": ["Barbell_Bench_Press_-_Medium_Grip", "pecho, tríceps, hombro"],
+  "Dominadas (lastre si haces más de 8)": ["Pullups", "dorsal, bíceps"],
+  "Press militar con mancuernas": ["Dumbbell_Shoulder_Press", "hombro, tríceps"],
+  "Remo con barra": ["Bent_Over_Barbell_Row", "dorsal, espalda media, bíceps"],
+  "Press inclinado con mancuernas": ["Incline_Dumbbell_Press", "pecho alto, hombro"],
+  "Face pull": ["Face_Pull", "deltoides posterior, trapecio"],
+  "Sentadilla trasera": ["Barbell_Squat", "cuádriceps, glúteos"],
+  "Prensa de piernas": ["Leg_Press", "cuádriceps, glúteos"],
+  "Peso muerto rumano": ["Romanian_Deadlift", "isquios, glúteos"],
+  "Extensión de cuádriceps": ["Leg_Extensions", "cuádriceps"],
+  "Gemelo de pie": ["Standing_Calf_Raises", "gemelos"],
+  "Rueda abdominal": ["Ab_Roller", "abdomen"],
+  "Press inclinado con barra": ["Barbell_Incline_Bench_Press_-_Medium_Grip", "pecho alto, hombro"],
+  "Jalón al pecho": ["Wide-Grip_Lat_Pulldown", "dorsal, bíceps"],
+  "Remo en polea baja": ["Seated_Cable_Rows", "espalda media, dorsal"],
+  "Fondos en paralelas (lastre si puedes)": ["Dips_-_Chest_Version", "pecho bajo, tríceps"],
+  "Aperturas en máquina o polea": ["Cable_Crossover", "pecho"],
+  "Elevaciones laterales": ["Side_Lateral_Raise", "deltoides lateral"],
+  "Curl con barra Z": ["EZ-Bar_Curl", "bíceps"],
+  "Press francés": ["EZ-Bar_Skullcrusher", "tríceps"],
+  "Curl inclinado con mancuernas": ["Incline_Dumbbell_Curl", "bíceps (cabeza larga)"],
+  "Extensión de tríceps en polea": ["Triceps_Pushdown_-_Rope_Attachment", "tríceps"],
+  "Elevaciones laterales en polea": ["Cable_Seated_Lateral_Raise", "deltoides lateral"],
+  "Pájaros (deltoides posterior)": ["Reverse_Flyes", "deltoides posterior"],
+  "Curl martillo": ["Hammer_Curls", "braquial, antebrazo"],
+  "Peso muerto convencional": ["Barbell_Deadlift", "isquios, glúteos, espalda"],
+  "Zancada búlgara (mancuernas)": ["Split_Squat_with_Dumbbells", "cuádriceps, glúteos"],
+  "Hip thrust": ["Barbell_Hip_Thrust", "glúteos"],
+  "Curl femoral": ["Lying_Leg_Curls", "isquios"],
+  "Gemelo sentado": ["Seated_Calf_Raise", "sóleo"],
+  "Elevación de piernas colgado": ["Hanging_Leg_Raise", "abdomen, flexores de cadera"],
+};
+
+// Qué rutina de movilidad toca según la sesión
+function mobilityFor(s) {
+  if (!s) return [];
+  if (["run", "test", "race", "hybrid"].includes(s.kind)) return ["pre", "post"];
+  return ["cadera"];
+}

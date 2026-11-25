@@ -121,6 +121,7 @@
     const tabs = [["hoy", "Hoy", "M3 10.5 12 3l9 7.5V21h-6v-6H9v6H3z"],
       ["plan", "Plan", "M8 2v4M16 2v4M3 9h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"],
       ["fuerza", "Fuerza", ICON.strength],
+      ["movilidad", "Movilidad", "M12 6.5a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM4 10.5l8 1.5 8-1.5M12 12v3.5l-4.5 6M12 15.5l4.5 6"],
       ["nutricion", "Comida", "M7 2v20M4 2v6a3 3 0 0 0 6 0V2M17 2c-1.7 0-3 2.2-3 5s1.3 5 3 5v10M17 2c1.7 0 3 2.2 3 5s-1.3 5-3 5"],
       ["progreso", "Progreso", "M3 3v18h18M7 15l4-4 3 3 6-6"],
       ["guia", "Guía", "M4 19.5A2.5 2.5 0 0 1 6.5 17H20V3H6.5A2.5 2.5 0 0 0 4 5.5zM4 19.5A2.5 2.5 0 0 0 6.5 22H20v-5"]];
@@ -128,6 +129,7 @@
       <a class="brand" href="#/hoy"><span class="logo"><svg viewBox="0 0 512 512" style="stroke:#b8f550;stroke-width:44"><path d="M282 196 236 306M282 196 338 246 390 222M276 200 212 226 176 282M236 306 322 350 306 438M236 306 208 392 126 374"/><circle cx="318" cy="118" r="42" fill="#b8f550" stroke="none"/></svg></span>
         <span><b>Mi planning</b><small>Semana ${wn} de ${WEEKS.length} · ${PHASES[w.phase].name}</small></span></a>
       <a class="ringbtn" href="#/progreso" title="Plan completado: ${o.done} de ${o.total} sesiones">${ring(o.pct)}<span>${o.pct}%</span><em class="side-only"><b>Plan completado</b><small>${o.done} de ${o.total} sesiones</small></em></a>
+      <a class="iconbtn mob-only" href="#/guia" aria-label="Guía del plan"><svg viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V3H6.5A2.5 2.5 0 0 0 4 5.5zM4 19.5A2.5 2.5 0 0 0 6.5 22H20v-5"/></svg></a>
       <a class="iconbtn ${active === "datos" ? "on" : ""}" href="#/datos" aria-label="Datos y copia de seguridad"><svg viewBox="0 0 24 24"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/></svg><span class="side-only">Datos y ajustes</span></a>`;
     $("#tabbar").innerHTML = tabs.map(([k, l, d]) =>
       `<a href="#/${k}" class="${active === k ? "on" : ""}"><svg viewBox="0 0 24 24"><path d="${d}"/></svg><span>${l}</span></a>`).join("");
@@ -197,6 +199,7 @@
         <span class="ph ${PHASES[w.phase].color}"><i></i>S${s.week} · ${PHASES[w.phase].name}</span>
       </div>
       ${stepsHtml(s.steps)}
+      ${mobChips(s)}
       ${label.startsWith("Hoy") || label.startsWith("Primera") || label.startsWith("Última") ? s.strength.map((k) => strengthBlock(k, s.week, s.id, false)).join("") : ""}
       ${watchNotesHtml(s)}
       ${label.startsWith("Hoy") || label.startsWith("Primera") || label.startsWith("Última") ? `<a class="btn primary block" href="#/sesion/${s.id}">${log ? `${ico("check")} ${STATUS[log.status]} · ver registro` : "Registrar sesión"}</a>` : ""}
@@ -535,7 +538,7 @@
       ${t.note ? `<p class="muted tiny">${esc(t.note)}</p>` : ""}`;
     if (!editable) {
       return `<div class="strength">${head}<div class="exlist">${t.rows.map((r) =>
-        `<div class="ex"><div class="ex-name">${esc(r.ex)}</div><div class="ex-sets">${esc(r.values[ci])}</div></div>`).join("")}</div></div>`;
+        `<div class="ex">${exThumb(r.ex)}<div class="ex-name">${esc(r.ex)}</div><div class="ex-sets">${esc(r.values[ci])}</div></div>`).join("")}</div></div>`;
     }
     return `<div class="strength" data-block="${k}">${head}
       <p class="muted tiny how">Ajusta <b>peso</b> y <b>reps</b> y toca la serie al acabarla. Se guarda sola. Para corregir una, tócala otra vez.</p>
@@ -551,7 +554,7 @@
         const reps0 = last?.reps ?? scheme.reps ?? prev?.sets?.[0]?.reps ?? null;
         const unit = isDumbbell(r.ex) ? "kg/manc." : isBodyweight(r.ex) ? "lastre kg" : "kg";
         return `<div class="exlog" data-ex="${esc(r.ex)}" data-reps="${scheme.reps ?? ""}">
-          <div class="exlog-head"><div class="ex-name">${esc(r.ex)}<small class="target">${esc(r.values[ci])} · descanso ${restLabel(restFor(r.ex))}</small></div><span class="exlog-stat"></span></div>
+          <div class="exlog-head">${exThumb(r.ex)}<div class="ex-name">${esc(r.ex)}<small class="target">${esc(r.values[ci])} · descanso ${restLabel(restFor(r.ex))}</small></div><span class="exlog-stat"></span></div>
           ${prev ? `<div class="exlog-prev">Última · ${fmtDate(prev.date)}: <b>${esc(prev.text)}</b>${sug?.up ? ` · <span class="up">↑ toca subir</span>` : ""}</div>` : ""}
           ${!saved.length && log?.loads?.[r.ex] ? `<div class="exlog-prev">Anotado: <b>${esc(log.loads[r.ex])}</b></div>` : ""}
           <div class="pick">
@@ -630,6 +633,125 @@
     const fx = Object.values(FX).find((f) => s.detail.includes(f));
     if (fx && lines.length) lines.push(fx);
     return lines.join("\n");
+  }
+
+  // ——— Movilidad y vídeos de ejercicios ———
+  const mediaHtml = (m, cls = "") => m.fig ? `<div class="media fig-wrap ${cls}">${Figs.svg(m.fig)}</div>`
+    : `<div class="media anim ${cls}"><img src="img/ex/${m.img}/0.jpg" alt="" loading="lazy"><img class="b" src="img/ex/${m.img}/1.jpg" alt="" loading="lazy"></div>`;
+  const doseTxt = (d) => `${d.reps ? `${d.reps} reps` : `${d.secs}"`}${d.sides ? " por lado" : ""}`;
+  const exThumb = (name) => GYM_MEDIA[name] ? `<button type="button" class="exthumb" data-exmedia="${esc(name)}" aria-label="Ver cómo se hace ${esc(name)}"><img src="img/ex/${GYM_MEDIA[name][0]}/0.jpg" alt="" loading="lazy"></button>` : "";
+  const mobDone = (date) => (Store.settings.mob || {})[date] || [];
+  function mobChips(s) {
+    const ids = mobilityFor(s);
+    if (!ids.length) return "";
+    return `<div class="mobchips"><span class="muted tiny">Movilidad</span>${ids.map((id) => { const r = ROUTINES.find((x) => x.id === id), d = mobDone(s.date).includes(id);
+      return `<button type="button" class="mobchip ${d ? "done" : ""}" data-play="${id}">${d ? "✓" : "▶"} ${esc(r.name)} · ${r.min}'</button>`; }).join("")}</div>`;
+  }
+  function openSheetHtml(title, html) {
+    closeSheet();
+    const sh = document.createElement("div");
+    sh.className = "sheet-wrap";
+    sh.innerHTML = `<div class="sheet" role="dialog" aria-modal="true" aria-label="${esc(title)}"><div class="sheet-head"><h2>${esc(title)}</h2><button class="iconbtn" data-close aria-label="Cerrar">×</button></div><div class="sheet-body">${html}</div></div>`;
+    document.body.appendChild(sh);
+    document.body.classList.add("noscroll");
+    sh.addEventListener("click", (e) => { if (e.target === sh || e.target.closest("[data-close]")) closeSheet(); });
+    Figs.start();
+  }
+  function openExercise(name) {
+    const g = GYM_MEDIA[name]; if (!g) return;
+    openSheetHtml(name, `${mediaHtml({ img: g[0] }, "big")}<p class="muscles">Trabaja: <b>${esc(g[1])}</b></p><p class="muted tiny">Imágenes: free-exercise-db (dominio público).</p>`);
+  }
+  function openMove(id, dose) {
+    const m = MOVES[id];
+    openSheetHtml(m.name, `${mediaHtml(m, "big")}${dose ? `<div class="pdose"><b class="small">${doseTxt(dose)}</b></div>` : ""}<ul class="cues">${m.cues.map((c) => `<li>${esc(c)}</li>`).join("")}</ul><p class="muscles">Estira: <b>${esc(m.muscles.join(", "))}</b></p>`);
+  }
+  document.addEventListener("click", (e) => {
+    const b = e.target.closest("[data-exmedia]");
+    if (b) { e.preventDefault(); e.stopPropagation(); openExercise(b.dataset.exmedia); return; }
+    const m = e.target.closest("[data-move]");
+    if (m) { e.preventDefault(); const r = ROUTINES.find((x) => x.id === m.dataset.routine); openMove(m.dataset.move, r && r.items.find((i) => i[0] === m.dataset.move)[1]); return; }
+    const p = e.target.closest("[data-play]");
+    if (p) { e.preventDefault(); playRoutine(p.dataset.play); }
+  });
+
+  // Rutina guiada: un ejercicio por pantalla, cronómetro en los de tiempo y cambio de lado
+  function playRoutine(rid) {
+    const r = ROUTINES.find((x) => x.id === rid); if (!r) return;
+    const steps = r.items.flatMap(([id, d]) => (d.sides ? [{ id, d, side: "Lado izquierdo" }, { id, d, side: "Lado derecho" }] : [{ id, d }]));
+    let i = 0, left = 0, timer = null, lock = null, actx = null;
+    try { if (navigator.wakeLock) navigator.wakeLock.request("screen").then((l) => (lock = l)).catch(() => {}); } catch {}
+    closeSheet();
+    const sh = document.createElement("div");
+    sh.className = "sheet-wrap";
+    document.body.appendChild(sh);
+    document.body.classList.add("noscroll");
+    const stop = () => { clearInterval(timer); timer = null; };
+    const close = () => { stop(); try { if (lock) lock.release(); } catch {} closeSheet(); route(); };
+    const beep = () => {
+      try {
+        actx = actx || new (window.AudioContext || window.webkitAudioContext)();
+        const o = actx.createOscillator(), g = actx.createGain();
+        o.frequency.value = 880; o.connect(g); g.connect(actx.destination);
+        g.gain.setValueAtTime(0.25, actx.currentTime); g.gain.exponentialRampToValueAtTime(0.001, actx.currentTime + 0.45);
+        o.start(); o.stop(actx.currentTime + 0.45);
+      } catch {}
+      if (navigator.vibrate) navigator.vibrate([120, 80, 120]);
+    };
+    const go = (n, auto) => { stop(); i = n; left = steps[i] ? steps[i].d.secs || 0 : 0; if (auto && left) startTimer(); else render(); };
+    const startTimer = () => {
+      stop();
+      timer = setInterval(() => {
+        left--;
+        const c = sh.querySelector("#pClock"); if (c) c.textContent = left + "\"";
+        if (left <= 0) { beep(); go(i + 1, true); }
+      }, 1000);
+      render();
+    };
+    function render() {
+      if (i >= steps.length) {
+        const mob = { ...(Store.settings.mob || {}) }, t = todayISO();
+        mob[t] = [...new Set([...(mob[t] || []), rid])];
+        Store.setSetting("mob", mob);
+        try { if (lock) lock.release(); } catch {}
+        sh.innerHTML = `<div class="sheet player" role="dialog" aria-modal="true"><div class="sheet-body done-screen"><div class="big-check">✓</div><h2>${esc(r.name)}: hecha</h2><p class="muted">${r.items.length} ejercicios · unos ${r.min} minutos</p><button class="btn primary" data-close>Cerrar</button></div></div>`;
+        return;
+      }
+      const st = steps[i], m = MOVES[st.id];
+      sh.innerHTML = `<div class="sheet player" role="dialog" aria-modal="true" aria-label="${esc(r.name)}">
+        <div class="sheet-head"><div><div class="eyebrow">${esc(r.name)} · ${i + 1}/${steps.length}</div><h2>${esc(m.name)}</h2></div><button class="iconbtn" data-close aria-label="Cerrar">×</button></div>
+        <div class="pbar"><i style="width:${(i / steps.length) * 100}%"></i></div>
+        <div class="sheet-body">${mediaHtml(m, "big")}
+          <div class="pdose">${st.side ? `<span class="side">${st.side}</span>` : ""}${st.d.secs ? `<b id="pClock">${left}"</b>` : `<b>${st.d.reps} reps</b>`}</div>
+          <ul class="cues">${m.cues.map((c) => `<li>${esc(c)}</li>`).join("")}</ul>
+          <p class="muscles">Estira: <b>${esc(m.muscles.join(", "))}</b></p></div>
+        <div class="pctl"><button class="btn" data-prev ${i === 0 ? "disabled" : ""} aria-label="Anterior">←</button>
+          ${st.d.secs ? `<button class="btn primary grow" data-timer>${timer ? "Pausa" : left < st.d.secs ? "Seguir" : "Empezar"}</button>` : `<button class="btn primary grow" data-next>Hecho ✓</button>`}
+          <button class="btn" data-skip aria-label="Siguiente">→</button></div></div>`;
+      Figs.start();
+    }
+    sh.addEventListener("click", (e) => {
+      if (e.target === sh || e.target.closest("[data-close]")) return close();
+      if (e.target.closest("[data-prev]")) return go(Math.max(0, i - 1));
+      if (e.target.closest("[data-skip]") || e.target.closest("[data-next]")) return go(i + 1);
+      if (e.target.closest("[data-timer]")) { if (timer) { stop(); render(); } else startTimer(); }
+    });
+    go(0);
+  }
+
+  // ——— Movilidad (pantalla) ———
+  function viewMovilidad() {
+    const t = todaySession(), rec = mobilityFor(t), done = mobDone(todayISO());
+    app.innerHTML = `
+      <section class="pagehead"><div class="eyebrow">Para corredores · cadera, flexores y tobillos</div><h1 class="display">Movilidad</h1>
+        <p class="muted">Hoy toca <b>${rec.map((id) => ROUTINES.find((r) => r.id === id).name.toLowerCase()).join(" y ")}</b>. Toca un ejercicio para ver cómo se hace, o empieza la rutina guiada con cronómetro.</p></section>
+      ${ROUTINES.map((r) => `<section class="card routine ${rec.includes(r.id) ? "rec" : ""}">
+        <div class="row-between"><div><div class="eyebrow">${esc(r.when)}${rec.includes(r.id) ? " · toca hoy" : ""}</div><h2>${esc(r.name)}</h2></div><span class="pill">${r.min}'</span></div>
+        <p class="muted tiny">${esc(r.tone)}</p>
+        <div class="mlist">${r.items.map(([id, d]) => `<button type="button" class="mrow" data-move="${id}" data-routine="${r.id}">${mediaHtml(MOVES[id], "thumb")}<span><b>${esc(MOVES[id].name)}</b><small>${doseTxt(d)}</small></span></button>`).join("")}</div>
+        <button class="btn ${done.includes(r.id) ? "" : "primary"} block" data-play="${r.id}">${done.includes(r.id) ? "✓ Hecha hoy · repetir" : "▶ Empezar rutina guiada"}</button>
+      </section>`).join("")}
+      <p class="muted tiny credits">Fotos: free-exercise-db (dominio público). Monigotes: en rojo, la zona que se estira.</p>`;
+    Figs.start();
   }
 
   // ——— Sesión ———
@@ -772,7 +894,7 @@
         const t = STRENGTH[x]; const ci = t.weekCol[wn];
         return `<section class="card"><div class="row-between"><h2><span class="fbadge">${x}</span>${esc(t.label)}</h2><span class="pill">${t.day}</span></div>
         ${t.note ? `<p class="muted">${esc(t.note)}</p>` : ""}
-        <div class="exlist">${t.rows.map((r) => `<div class="ex"><div class="ex-name">${esc(r.ex)}</div><div class="ex-sets now">${esc(r.values[ci])}</div></div>`).join("")}</div>
+        <div class="exlist">${t.rows.map((r) => `<div class="ex">${exThumb(r.ex)}<div class="ex-name">${esc(r.ex)}</div><div class="ex-sets now">${esc(r.values[ci])}</div></div>`).join("")}</div>
         <details class="mt"><summary>Progresión completa</summary>
         <div class="scroll-x"><table class="tbl wide"><thead><tr><th>Ejercicio</th>${t.cols.map((c, i) => `<th class="${i === ci ? "hl" : ""}">${c}</th>`).join("")}</tr></thead>
         <tbody>${t.rows.map((r) => `<tr><td>${esc(r.ex)}</td>${r.values.map((v, i) => `<td class="${i === ci ? "hl" : ""}">${esc(v)}</td>`).join("")}</tr>`).join("")}</tbody></table></div></details>
@@ -1652,7 +1774,7 @@
     const [, view = "hoy", arg] = location.hash.split("/");
     header(view === "sesion" ? "plan" : view);
     app.dataset.view = view;
-    ({ hoy: viewHoy, plan: () => viewPlan(arg), sesion: () => viewSesion(arg), fuerza: () => viewFuerza(arg),
+    ({ hoy: viewHoy, plan: () => viewPlan(arg), sesion: () => viewSesion(arg), fuerza: () => viewFuerza(arg), movilidad: viewMovilidad,
       nutricion: () => viewNutricion(arg), progreso: viewProgreso, guia: viewGuia, datos: viewDatos }[view] || viewHoy)();
   }
   window.addEventListener("hashchange", () => { route(); window.scrollTo(0, 0); });
