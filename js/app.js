@@ -293,6 +293,31 @@
     const opts = [[long, sets, rir, k, d], [long, sets, k, d], [short, sets, rir, k, d], [short, sets, k, d], [short, sets, k]].map((x) => x.filter(Boolean).join(" "));
     return opts.find((x) => x.length <= WATCH_W) || opts[opts.length - 1];
   }
+  // Días solo de carrera: título + pasos abreviados y partidos en líneas de 24 caracteres
+  const RUN_ABBR = [[/\bcontinuos\b/g, "cont"], [/\bprogresivos\b/g, "prog"], [/Calentamiento/g, "Calent"],
+    [/\blos (\d+) últimos\b/g, "últ $1 km"], [/\(~ ?([\d,]+ km)\)/g, "~$1"], [/primer km/g, "km 1"], [/nunca más rápido/g, "no más rápido"],
+    [/\bmovilidad\b/g, "movil."], [/ sin mirar a nadie/g, " a lo tuyo"]];
+  // Parte en trozos por «, », « + » y «: » y los empaqueta en líneas; solo corta palabras si un trozo no cabe
+  function wrapW(text) {
+    const out = [];
+    let cur = "";
+    text.split(/(?<=,|:) | (?=\+ )/).flatMap((c) => (c.length <= WATCH_W ? [c.replace(/ /g, "\u0000")] : c.split(" "))).forEach((w) => {
+      if (!cur) cur = w;
+      else if ((cur + " " + w).length <= WATCH_W) cur += " " + w;
+      else { out.push(cur); cur = w; }
+    });
+    if (cur) out.push(cur);
+    return out.map((l) => l.replace(/\u0000/g, " "));
+  }
+  function runLines(s) {
+    const ro = ATHLETE.targets[target()].pace.replace("/km", "");
+    const steps = s.steps.filter((x) => !/^(Apunta|Prepara)/.test(x)).map((x) => {
+      let t = watchTxt(x.replace(/^C \((\d+')\)/, "Calent $1").replace(/\bRO\b/g, `RO ${ro}`));
+      RUN_ABBR.forEach(([re, b]) => (t = t.replace(re, b)));
+      return t;
+    });
+    return [watchTxt(s.title).toUpperCase().slice(0, WATCH_W), ...steps.flatMap(wrapW)].slice(0, WATCH_LINES);
+  }
   function watchLines(s) {
     if (!s || s.kind === "rest") return [];
     const lines = [];
@@ -305,7 +330,7 @@
         lines.push(exLine(r.ex, r.values[ci], sug ? sug.kg : null));
       });
     });
-    if (!lines.length) return watchNotes(s).map((n) => n.text).join("|").split("|"); // días solo de carrera
+    if (!lines.length) return runLines(s); // días solo de carrera
     const fx = Object.keys(FX_SHORT).find((key) => s.detail.includes(FX[key]));
     if (fx && lines.length < WATCH_LINES) lines.push(FX_SHORT[fx]);
     return lines;
