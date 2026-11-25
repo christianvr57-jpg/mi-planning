@@ -4,18 +4,8 @@ import vm from "node:vm";
 
 const ctx = {};
 vm.createContext(ctx);
-const src = (f) => fs.readFileSync(new URL("../../js/" + f, import.meta.url), "utf8");
-vm.runInContext(src("plan.js") + ";" + src("coach.js") + ";this.P = { WEEKS, STRENGTH, FX, Coach };", ctx);
-const { WEEKS, STRENGTH, FX, Coach } = ctx.P;
-
-// Ajustes aprobados en el bot del entrenador (si está configurado)
-if (process.env.COACH_URL && process.env.COACH_TOKEN) {
-  try {
-    const r = await fetch(process.env.COACH_URL.replace(/\/$/, "") + "/api/overrides", { headers: { authorization: "Bearer " + process.env.COACH_TOKEN } });
-    const { ov } = await r.json();
-    console.log("Ajustes del entrenador:", Coach.apply(ov || {}));
-  } catch (e) { console.error("No se pudieron leer los ajustes:", e.message); }
-}
+vm.runInContext(fs.readFileSync(new URL("../../js/plan.js", import.meta.url), "utf8") + ";this.P = { WEEKS, STRENGTH, FX };", ctx);
+const { WEEKS, STRENGTH, FX } = ctx.P;
 
 const today = process.env.FECHA || new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Madrid" }).format(new Date());
 const s = WEEKS.flatMap((w) => w.sessions).find((x) => x.date === today);
@@ -34,8 +24,7 @@ if (s.kind === "rest") {
   const lines = [[s.duration, ...steps].join(" · ")];
   s.strength.forEach((k) => {
     const t = STRENGTH[k], ci = t.weekCol[s.week];
-    const val = (r) => Coach.modScheme(r.values[ci], r.ex, s.strengthMod);
-    const ex = t.rows.filter((r) => val(r) && val(r) !== "—").map((r) => `${clean(r.ex)} ${val(r)}`);
+    const ex = t.rows.filter((r) => r.values[ci] && r.values[ci] !== "—").map((r) => `${clean(r.ex)} ${r.values[ci]}`);
     lines.push(`${t.label}: ${ex.join(", ")}`);
   });
   body = lines.join("\n");
