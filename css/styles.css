@@ -715,3 +715,87 @@ output { background: var(--accent); font-weight: 700; }
 .danger-zone { border: 0; }
 .wh-top h1 { font-weight: 700; letter-spacing: -.03em; }
 .bigring b, .kcal-ring b, .goal-card b, .rc-days b, .wh-ring span, .ringbtn span, .scard-day b, .nm-ring span { font-weight: 700; }
+
+/* ============ Escritorio (≥ 1024 px): barra lateral + contenido a dos columnas ============ */
+.side-only { display: none; }
+@media (min-width: 1024px) {
+  :root { --side: 248px; }
+  body { padding-bottom: 0; font-size: 15.5px; }
+
+  /* Barra lateral: la cabecera se convierte en columna fija a la izquierda */
+  .topbar {
+    position: fixed; top: 0; left: 0; bottom: 0; width: var(--side); z-index: 30;
+    flex-direction: column; align-items: stretch; gap: 6px;
+    padding: 22px 14px 18px; border-bottom: 0; border-right: .5px solid var(--border);
+    background: color-mix(in srgb, var(--surface) 55%, var(--bg));
+  }
+  .brand { flex: 0 0 auto; padding: 0 8px 18px; gap: 12px; }
+  .brand b { font-size: 1.05rem; }
+  .logo { width: 40px; height: 40px; border-radius: 11px; }
+  .logo svg { width: 25px; height: 25px; }
+
+  /* Pestañas: lista vertical dentro de la barra lateral */
+  .tabbar {
+    position: fixed; top: 96px; left: 14px; bottom: auto; transform: none; z-index: 31;
+    width: calc(var(--side) - 28px); flex-direction: column; gap: 2px; padding: 0;
+    background: none; border: 0; border-radius: 0; box-shadow: none; backdrop-filter: none; -webkit-backdrop-filter: none;
+  }
+  .tabbar a { flex-direction: row; justify-content: flex-start; gap: 12px; padding: 9px 12px; font-size: .95rem; font-weight: 500; color: var(--text-2); border-radius: 10px; }
+  .tabbar a svg { width: 20px; height: 20px; color: var(--accent); }
+  .tabbar a:hover { background: color-mix(in srgb, var(--text) 5%, transparent); }
+  .tabbar a.on { background: var(--accent); color: #fff; }
+  .tabbar a.on svg { color: #fff; }
+
+  /* Pie de la barra lateral: progreso del plan y ajustes */
+  .side-only { display: block; }
+  .ringbtn { margin-top: auto; width: auto; height: auto; display: flex; align-items: center; gap: 12px; padding: 12px; border-radius: 14px; background: var(--surface); color: var(--text); }
+  .ringbtn > span { position: absolute; inset: auto; left: 12px; top: 12px; width: 40px; height: 40px; }
+  .ringbtn em { font-style: normal; line-height: 1.25; }
+  .ringbtn em b { display: block; font-size: .85rem; }
+  .ringbtn em small { color: var(--muted); font-size: .78rem; }
+  .iconbtn { width: auto; height: auto; justify-content: flex-start; display: flex; align-items: center; gap: 12px; padding: 9px 12px; border-radius: 10px; color: var(--text-2); font-size: .95rem; font-weight: 500; text-decoration: none; }
+  .iconbtn svg { color: var(--accent); width: 20px; height: 20px; }
+  .iconbtn:hover { background: color-mix(in srgb, var(--text) 5%, transparent); }
+  .iconbtn.on { background: var(--accent); color: #fff; }
+  .iconbtn.on svg { color: #fff; }
+
+  /* Contenido */
+  .wrap { margin-left: var(--side); max-width: 1240px; padding: 36px 44px 64px; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 20px; align-items: start; }
+  .wrap > * { grid-column: 1 / -1; min-width: 0; }
+  @media (min-width: 1500px) { .wrap { margin-left: calc(var(--side) + (100vw - var(--side) - 1240px) / 2); } }
+  .display { font-size: 2.6rem; }
+  .card, .hero, .weekhead { padding: 24px; }
+  .toast { bottom: 28px; left: calc(50% + var(--side) / 2); }
+  a.card:hover, .scard:hover { background: color-mix(in srgb, var(--text) 3%, var(--surface)); }
+  .scard { transition: background .15s; }
+
+  /* Hoy: sesión a la izquierda, resto a la derecha */
+  .wrap[data-view="hoy"] { grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr); grid-auto-flow: row dense; }
+  .wrap[data-view="hoy"] > * { grid-column: 2; }
+  .wrap[data-view="hoy"] > .greet { grid-column: 1 / -1; }
+  .wrap[data-view="hoy"] > .hero { grid-column: 1; grid-row: span 8; position: sticky; top: 28px; }
+
+  /* Plan: semana a la izquierda, días a la derecha */
+  .wrap[data-view="plan"] > .weekhead, .wrap[data-view="plan"] > .weekhead ~ .card { grid-column: 1; }
+  .wrap[data-view="plan"] > .list { grid-column: 2; grid-row: 2 / span 3; }
+  .wrap[data-view="plan"] { grid-auto-flow: row dense; }
+
+  /* Sesión: ficha fija a la izquierda, registro a la derecha */
+  .wrap[data-view="sesion"] { grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); }
+  .wrap[data-view="sesion"] > .hero { grid-column: 1; position: sticky; top: 28px; }
+  .wrap[data-view="sesion"] > form { grid-column: 2; }
+
+  /* Pantallas de tarjetas: dos columnas tipo mosaico */
+  .wrap[data-view="fuerza"], .wrap[data-view="guia"], .wrap[data-view="datos"], .wrap[data-view="progreso"] { display: block; columns: 2; column-gap: 20px; }
+  .wrap[data-view="fuerza"] > *, .wrap[data-view="guia"] > *, .wrap[data-view="datos"] > *, .wrap[data-view="progreso"] > * { break-inside: avoid; margin: 0 0 20px; }
+  .wrap[data-view="nutricion"] > .card { grid-column: auto; align-self: stretch; }
+  .wrap[data-view="nutricion"] > .meal ~ .card:not(.meal) { grid-column: 1 / -1; }
+  .wrap[data-view="nutricion"] > .kcalcard { column-span: none; }
+  .wrap > .pagehead, .wrap > .pager, .wrap > .statgrid, .wrap > .kcalcard { column-span: all; }
+  .pagehead { padding: 0 4px 8px; }
+}
+@media (min-width: 1024px) and (max-width: 1199px) {
+  :root { --side: 216px; }
+  .wrap { padding: 28px 28px 56px; }
+  .wrap[data-view="hoy"] { grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); }
+}

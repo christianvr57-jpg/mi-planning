@@ -127,8 +127,8 @@
     $("#topbar").innerHTML = `
       <a class="brand" href="#/hoy"><span class="logo"><svg viewBox="0 0 512 512" style="stroke:#b8f550;stroke-width:44"><path d="M282 196 236 306M282 196 338 246 390 222M276 200 212 226 176 282M236 306 322 350 306 438M236 306 208 392 126 374"/><circle cx="318" cy="118" r="42" fill="#b8f550" stroke="none"/></svg></span>
         <span><b>Mi planning</b><small>Semana ${wn} de ${WEEKS.length} · ${PHASES[w.phase].name}</small></span></a>
-      <a class="ringbtn" href="#/progreso" title="Plan completado: ${o.done} de ${o.total} sesiones">${ring(o.pct)}<span>${o.pct}%</span></a>
-      <a class="iconbtn" href="#/datos" aria-label="Datos y copia de seguridad"><svg viewBox="0 0 24 24"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/></svg></a>`;
+      <a class="ringbtn" href="#/progreso" title="Plan completado: ${o.done} de ${o.total} sesiones">${ring(o.pct)}<span>${o.pct}%</span><em class="side-only"><b>Plan completado</b><small>${o.done} de ${o.total} sesiones</small></em></a>
+      <a class="iconbtn ${active === "datos" ? "on" : ""}" href="#/datos" aria-label="Datos y copia de seguridad"><svg viewBox="0 0 24 24"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/></svg><span class="side-only">Datos y ajustes</span></a>`;
     $("#tabbar").innerHTML = tabs.map(([k, l, d]) =>
       `<a href="#/${k}" class="${active === k ? "on" : ""}"><svg viewBox="0 0 24 24"><path d="${d}"/></svg><span>${l}</span></a>`).join("");
   }
@@ -1651,6 +1651,7 @@
   function route() {
     const [, view = "hoy", arg] = location.hash.split("/");
     header(view === "sesion" ? "plan" : view);
+    app.dataset.view = view;
     ({ hoy: viewHoy, plan: () => viewPlan(arg), sesion: () => viewSesion(arg), fuerza: () => viewFuerza(arg),
       nutricion: () => viewNutricion(arg), progreso: viewProgreso, guia: viewGuia, datos: viewDatos }[view] || viewHoy)();
   }
