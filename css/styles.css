@@ -858,3 +858,8 @@ output { background: var(--accent); font-weight: 700; }
 }
 .media.thumb .fig { transform: scale(1.35); }
 .sheet.player { animation: none; }
+
+/* Ajuste del entrenador */
+.coachnote { margin-top: 12px; padding: 10px 12px; border-radius: 12px; background: color-mix(in srgb, var(--accent, #007aff) 12%, transparent); font-size: 14px; line-height: 1.4; }
+.coachnote b { display: block; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--accent, #007aff); margin-bottom: 2px; }
+.coachnote small { display: block; margin-top: 4px; opacity: .8; }

@@ -1,0 +1,19 @@
+{
+  "name": "mi-planning-coach",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "deploy": "wrangler deploy",
+    "dev": "wrangler dev"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "1.14.0"
+  },
+  "devDependencies": {
+    "wrangler": "4.168.0"
+  },
+  "allowScripts": {
+    "workerd@1.20261123.1": true,
+    "esbuild@0.28.2": true
+  }
+}

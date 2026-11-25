@@ -1,0 +1,16 @@
+name = "mi-planning-coach"
+main = "src/index.js"
+compatibility_date = "2026-11-01"
+compatibility_flags = ["nodejs_compat"]
+
+# 07:00 en Madrid (invierno = UTC+1): mensaje de la mañana con el entreno y el check-in
+[triggers]
+crons = ["0 6 * * *"]
+
+[[kv_namespaces]]
+binding = "KV"
+id = "PON_AQUI_EL_ID_DEL_KV"
+
+[vars]
+APP_ORIGIN = "https://christianvr57-jpg.github.io"
+MODEL = "claude-opus-5-5"

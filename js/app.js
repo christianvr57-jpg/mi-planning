@@ -4,6 +4,7 @@
   const app = $("#app");
   const ALL = WEEKS.flatMap((w) => w.sessions);
   const byId = Object.fromEntries(ALL.map((s) => [s.id, s]));
+  const rv = (r, ci, s) => Coach.modScheme(r.values[ci], r.ex, s && s.strengthMod); // series con el ajuste del entrenador
 
   // ——— utilidades ———
   const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -198,6 +199,7 @@
         ${s.kind !== "rest" ? `<span>${meter(s.intensity)} ${INT[s.intensity]}</span>` : ""}
         <span class="ph ${PHASES[w.phase].color}"><i></i>S${s.week} · ${PHASES[w.phase].name}</span>
       </div>
+      ${s.coach ? `<div class="coachnote"><b>Ajustada por tu entrenador</b>${esc(s.coach)}${s.strengthMod ? `<small>${esc(coachModTxt(s.strengthMod))}</small>` : ""}</div>` : ""}
       ${stepsHtml(s.steps)}
       ${mobChips(s)}
       ${label.startsWith("Hoy") || label.startsWith("Primera") || label.startsWith("Última") ? s.strength.map((k) => strengthBlock(k, s.week, s.id, false)).join("") : ""}
@@ -239,11 +241,11 @@
     // Un ejercicio por nota, con la carga de la última vez y la sugerida
     (s.strength || []).forEach((k) => {
       const t = STRENGTH[k], ci = t.weekCol[s.week];
-      const rows = t.rows.filter((r) => parseScheme(r.values[ci]));
+      const rows = t.rows.filter((r) => parseScheme(rv(r, ci, s)));
       rows.forEach((r, i) => {
         const prev = lastSets(r.ex, s.date);
-        const sug = suggestKg(k, parseScheme(r.values[ci]), prev);
-        const lines = [`${i + 1}/${rows.length} ${shortEx(r.ex)}`, r.values[ci]];
+        const sug = suggestKg(k, parseScheme(rv(r, ci, s)), prev);
+        const lines = [`${i + 1}/${rows.length} ${shortEx(r.ex)}`, rv(r, ci, s)];
         if (sug) lines.push(`Hoy: ${kgStr(sug.kg)} kg${sug.up ? " (sube)" : ""}`);
         if (prev) lines.push(`Ult: ${prev.text}`);
         notes.splice(notes.length, 0, { title: shortEx(r.ex), text: lines.map(watchTxt).join("|"), ex: true });
@@ -327,10 +329,10 @@
     (s.strength || []).forEach((k) => {
       const ci = STRENGTH[k].weekCol[s.week];
       STRENGTH[k].rows.forEach((r) => {
-        const sc = parseScheme(r.values[ci]);
+        const sc = parseScheme(rv(r, ci, s));
         if (!sc) return;
         const sug = suggestKg(k, sc, lastSets(r.ex, s.date));
-        lines.push(exLine(r.ex, r.values[ci], sug ? sug.kg : null));
+        lines.push(exLine(r.ex, rv(r, ci, s), sug ? sug.kg : null));
       });
     });
     if (!lines.length) return runLines(s); // días solo de carrera
@@ -538,12 +540,12 @@
       ${t.note ? `<p class="muted tiny">${esc(t.note)}</p>` : ""}`;
     if (!editable) {
       return `<div class="strength">${head}<div class="exlist">${t.rows.map((r) =>
-        `<div class="ex">${exThumb(r.ex)}<div class="ex-name">${esc(r.ex)}</div><div class="ex-sets">${esc(r.values[ci])}</div></div>`).join("")}</div></div>`;
+        `<div class="ex">${exThumb(r.ex)}<div class="ex-name">${esc(r.ex)}</div><div class="ex-sets">${esc(rv(r, ci, s))}</div></div>`).join("")}</div></div>`;
     }
     return `<div class="strength" data-block="${k}">${head}
       <p class="muted tiny how">Ajusta <b>peso</b> y <b>reps</b> y toca la serie al acabarla. Se guarda sola. Para corregir una, tócala otra vez.</p>
       ${t.rows.map((r) => {
-        const scheme = parseScheme(r.values[ci]);
+        const scheme = parseScheme(rv(r, ci, s));
         if (!scheme) return "";
         const prev = lastSets(r.ex, s.date);
         const sug = suggestKg(k, scheme, prev);
@@ -554,7 +556,7 @@
         const reps0 = last?.reps ?? scheme.reps ?? prev?.sets?.[0]?.reps ?? null;
         const unit = isDumbbell(r.ex) ? "kg/manc." : isBodyweight(r.ex) ? "lastre kg" : "kg";
         return `<div class="exlog" data-ex="${esc(r.ex)}" data-reps="${scheme.reps ?? ""}">
-          <div class="exlog-head">${exThumb(r.ex)}<div class="ex-name">${esc(r.ex)}<small class="target">${esc(r.values[ci])} · descanso ${restLabel(restFor(r.ex))}</small></div><span class="exlog-stat"></span></div>
+          <div class="exlog-head">${exThumb(r.ex)}<div class="ex-name">${esc(r.ex)}<small class="target">${esc(rv(r, ci, s))} · descanso ${restLabel(restFor(r.ex))}</small></div><span class="exlog-stat"></span></div>
           ${prev ? `<div class="exlog-prev">Última · ${fmtDate(prev.date)}: <b>${esc(prev.text)}</b>${sug?.up ? ` · <span class="up">↑ toca subir</span>` : ""}</div>` : ""}
           ${!saved.length && log?.loads?.[r.ex] ? `<div class="exlog-prev">Anotado: <b>${esc(log.loads[r.ex])}</b></div>` : ""}
           <div class="pick">
@@ -1640,6 +1642,7 @@
         <div class="actions"><button class="btn primary" id="exp">Exportar copia (.json)</button><label class="btn" for="imp">Importar copia</label><input type="file" id="imp" accept=".json,application/json" hidden></div>
         <div class="actions"><button class="btn ghost" id="copyAll">${ico("copy")} Copiar todos los datos (JSON)</button></div>
       </section>
+      ${coachCard()}
       ${stravaCard()}
       <section class="card" id="pushCard"><h2>Aviso diario</h2><p class="muted">Cada mañana, sobre las 7:00, una notificación con tu entreno del día.</p><div id="pushBody" class="muted tiny">Comprobando…</div></section>
       <section class="card"><h2>Apariencia</h2>
@@ -1667,6 +1670,7 @@
     };
     $("#copyAll").onclick = () => copy(Store.exportJSON(), $("#copyAll"));
     bindStravaCard();
+    bindCoachCard();
     pushCard();
     $("#themeSeg").onclick = (e) => { const b = e.target.closest("button"); if (!b) return; Store.setSetting("theme", b.dataset.v); applyTheme(); viewDatos(); };
     $("#tgSeg2").onclick = (e) => { const b = e.target.closest("button"); if (!b) return; Store.setSetting("activeTarget", b.dataset.v); viewDatos(); toast(`Ritmo objetivo ${b.dataset.v} activo`); };
@@ -1708,6 +1712,39 @@
   }
 
   // ——— Strava ———
+  // ——— Entrenador (bot de Telegram) ———
+  function coachModTxt(m) {
+    const p = [];
+    if (m.sets) p.push(`${m.sets > 0 ? "+" : ""}${m.sets} serie${Math.abs(m.sets) > 1 ? "s" : ""} por ejercicio`);
+    if (m.rir) p.push(`RIR ${m.rir > 0 ? "+" : ""}${m.rir}`);
+    if (m.drop && m.drop.length) p.push(`sin ${m.drop.join(", ")}`);
+    return p.join(" · ");
+  }
+  function coachCard() {
+    const c = Coach.cfg;
+    if (Coach.connected()) {
+      const n = Object.keys(c.ov || {}).length;
+      return `<section class="card"><h2>Entrenador en Telegram</h2>
+        <p>✓ Conectado. ${n ? `Hay <b>${n}</b> sesión${n > 1 ? "es" : ""} ajustada${n > 1 ? "s" : ""}.` : "Sin ajustes ahora mismo."}</p>
+        <p class="muted tiny">Última sincronización: ${c.at ? new Date(c.at).toLocaleString("es-ES", { dateStyle: "short", timeStyle: "short" }) : "—"}${c.err ? ` · error: ${esc(c.err)}` : ""}</p>
+        <div class="actions">${c.bot ? `<a class="btn primary" href="https://t.me/${esc(c.bot)}" target="_blank" rel="noopener">Abrir el bot</a>` : ""}<button class="btn" id="coSync">Sincronizar ahora</button><button class="btn danger" id="coOff">Desconectar</button></div></section>`;
+    }
+    return `<section class="card"><h2>Entrenador en Telegram</h2>
+      <p class="muted">Escríbele al bot cómo vas y te ajusta los entrenos. Los cambios que apruebes aparecen aquí solos.</p>
+      <ol class="steps tiny"><li>Abre tu bot en Telegram y envía <b>/start</b>.</li><li>Te dará un <b>código de conexión</b>: pégalo aquí.</li></ol>
+      <input id="coCode" placeholder="planning:…" autocomplete="off"><div class="actions"><button class="btn primary" id="coUse">Conectar</button></div></section>`;
+  }
+  function bindCoachCard() {
+    const on = (sel, fn) => { const el = $(sel); if (el) el.onclick = fn; };
+    on("#coUse", async () => {
+      try { Coach.useCode($("#coCode").value); } catch { toast("Ese código no es válido"); return; }
+      await Coach.sync(true);
+      toast(Coach.cfg.err ? "No se pudo conectar: " + Coach.cfg.err : "Entrenador conectado ✓"); viewDatos();
+    });
+    on("#coSync", async () => { await Coach.sync(true); toast(Coach.cfg.err ? "Error: " + Coach.cfg.err : "Sincronizado ✓"); viewDatos(); });
+    on("#coOff", () => { if (confirm("¿Desconectar el entrenador? Se quitan los ajustes de este dispositivo.")) { Coach.disconnect(); viewDatos(); } });
+  }
+
   function stravaCard() {
     const c = Strava.get();
     if (Strava.connected()) return `<section class="card"><h2>Strava</h2>
@@ -1778,6 +1815,7 @@
       nutricion: () => viewNutricion(arg), progreso: viewProgreso, guia: viewGuia, datos: viewDatos }[view] || viewHoy)();
   }
   window.addEventListener("hashchange", () => { route(); window.scrollTo(0, 0); });
+  window.addEventListener("coach-updated", () => { if (!document.querySelector(".sheet-wrap") && !document.activeElement?.closest?.("form")) route(); toast("Tu entrenador ha ajustado el plan"); });
   applyTheme();
   if (new URLSearchParams(location.search).get("state") === "strava") {
     location.hash = "#/datos";
