@@ -1519,6 +1519,7 @@
         <div class="actions"><button class="btn ghost" id="copyAll">${ico("copy")} Copiar todos los datos (JSON)</button></div>
       </section>
       ${stravaCard()}
+      <section class="card" id="pushCard"><h2>Aviso diario</h2><p class="muted">Cada mañana, sobre las 7:00, una notificación con tu entreno del día.</p><div id="pushBody" class="muted tiny">Comprobando…</div></section>
       <section class="card"><h2>Apariencia</h2>
         <div class="seg" id="themeSeg">${[["auto", "Automático"], ["light", "Claro"], ["dark", "Oscuro"]].map(([v, l]) => `<button data-v="${v}" class="${theme === v ? "on" : ""}">${l}</button>`).join("")}</div></section>
       <section class="card"><h2>Ritmo objetivo</h2><p class="muted">Lo decide el test de 10 km de la semana 10.</p>
@@ -1544,9 +1545,44 @@
     };
     $("#copyAll").onclick = () => copy(Store.exportJSON(), $("#copyAll"));
     bindStravaCard();
+    pushCard();
     $("#themeSeg").onclick = (e) => { const b = e.target.closest("button"); if (!b) return; Store.setSetting("theme", b.dataset.v); applyTheme(); viewDatos(); };
     $("#tgSeg2").onclick = (e) => { const b = e.target.closest("button"); if (!b) return; Store.setSetting("activeTarget", b.dataset.v); viewDatos(); toast(`Ritmo objetivo ${b.dataset.v} activo`); };
     $("#reset").onclick = () => { if (confirm("¿Seguro? Se borrarán todos los registros de este navegador.") && confirm("Última confirmación: no se puede deshacer.")) { Store.reset(); toast("Registros borrados"); route(); } };
+  }
+
+  // ——— Aviso diario (Web Push) ———
+  const VAPID_PUBLIC = "BJVyiOdDFr7olgp-GC9ueCqJFsfC_POZGyfM3moGeLDzoBLBrhYbTfZeeZsQAAGtcRUsI50K-0d6u3OzuVJoxdI";
+  const b64ToBytes = (b) => { const p = "=".repeat((4 - (b.length % 4)) % 4); const r = atob((b + p).replace(/-/g, "+").replace(/_/g, "/")); return Uint8Array.from(r, (c) => c.charCodeAt(0)); };
+  async function pushCard() {
+    const box = $("#pushBody"); if (!box) return;
+    const standalone = matchMedia("(display-mode: standalone)").matches || navigator.standalone;
+    if (!("serviceWorker" in navigator) || !("PushManager" in window) || !("Notification" in window)) {
+      box.innerHTML = /iPhone|iPad/.test(navigator.userAgent) && !standalone
+        ? "En el iPhone los avisos solo funcionan con la app instalada: Safari → Compartir → «Añadir a pantalla de inicio», y ábrela desde el icono."
+        : "Este navegador no admite notificaciones.";
+      return;
+    }
+    const reg = await navigator.serviceWorker.getRegistration();
+    if (!reg) { box.textContent = "Abre la app desde su web (https) para activar los avisos."; return; }
+    const sub = await reg.pushManager.getSubscription();
+    if (!sub) {
+      box.innerHTML = `<div class="actions"><button class="btn primary" id="pushOn">Activar avisos</button></div>`;
+      $("#pushOn").onclick = async () => {
+        try {
+          if ((await Notification.requestPermission()) !== "granted") { toast("Permiso de notificaciones denegado"); return; }
+          await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64ToBytes(VAPID_PUBLIC) });
+          toast("Avisos activados ✓"); pushCard();
+        } catch (e) { toast("No se pudo activar: " + e.message); }
+      };
+      return;
+    }
+    const code = JSON.stringify(sub);
+    box.innerHTML = `<p>✓ Activados en este dispositivo. Último paso: copia el código y pásamelo (a Claude) para guardarlo en el envío diario. Solo hace falta una vez.</p>
+      <div class="actions"><button class="btn primary" id="pushCopy">${ico("copy")} Copiar código</button><button class="btn ghost" id="pushTest">Probar aviso</button><button class="btn danger" id="pushOff">Desactivar</button></div>`;
+    $("#pushCopy").onclick = () => copy(code, $("#pushCopy"));
+    $("#pushTest").onclick = () => { const t = todaySession(); reg.showNotification(t.kind === "rest" ? "Hoy toca descanso" : `Hoy: ${t.title}`, { body: `${t.duration} · ${t.steps.join(" · ")}`, icon: "icon-192.png", tag: "prueba", data: { url: "./#/hoy" } }); };
+    $("#pushOff").onclick = async () => { await sub.unsubscribe(); toast("Avisos desactivados"); pushCard(); };
   }
 
   // ——— Strava ———
