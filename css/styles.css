@@ -858,3 +858,15 @@ output { background: var(--accent); font-weight: 700; }
 }
 .media.thumb .fig { transform: scale(1.35); }
 .sheet.player { animation: none; }
+
+/* Diario de comidas (calculado por Claude) */
+.dtable-wrap { overflow-x: auto; margin: 10px -4px 4px; }
+.dtable { width: 100%; border-collapse: collapse; font-size: 14px; font-variant-numeric: tabular-nums; }
+.dtable th, .dtable td { padding: 7px 4px; text-align: right; border-bottom: 1px solid var(--border); }
+.dtable th:first-child, .dtable td:first-child { text-align: left; }
+.dtable th { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; opacity: .6; }
+.dtable td small { display: block; font-size: 12px; opacity: .6; }
+.dtable tr.grp td { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; opacity: .6; padding-top: 12px; }
+.dtable tfoot td { font-weight: 700; border-bottom: 0; }
+.dtable tfoot tr.obj td, .dtable tfoot tr.dif td { font-weight: 500; font-size: 13px; opacity: .85; padding-top: 3px; padding-bottom: 3px; }
+.dtable .neg { color: #ff3b30; } .dtable .pos { color: #34c759; }

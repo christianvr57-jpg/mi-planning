@@ -1222,7 +1222,41 @@
     const added = (st.added[meal.id] || []).map((a, j) => ({ ...a, j }));
     return { opt, items, added };
   }
+  // Diario de comidas: lo que le cuentas a Claude se publica en data/diario.json
+  const DIARIO_KEY = "mi-planning-diario";
+  let DIARIO = {};
+  try { DIARIO = JSON.parse(localStorage.getItem(DIARIO_KEY)) || {}; } catch { DIARIO = {}; }
+  async function loadDiario() {
+    try {
+      const r = await fetch("data/diario.json", { cache: "no-store" });
+      if (!r.ok) return;
+      const txt = await r.text();
+      if (txt === localStorage.getItem(DIARIO_KEY)) return;
+      DIARIO = JSON.parse(txt);
+      try { localStorage.setItem(DIARIO_KEY, txt); } catch {}
+      if (["nutricion", "progreso"].includes(app.dataset.view)) { const y = window.scrollY; route(); window.scrollTo(0, y); }
+    } catch {}
+  }
+  const diaryTotals = (day) => day.items.reduce((a, x) => ({ k: a.k + x.k, p: a.p + x.p, c: a.c + x.c, f: a.f + x.f }), { k: 0, p: 0, c: 0, f: 0 });
+  function diaryCard(date, tg) {
+    const day = DIARIO[date];
+    if (!day || !day.items?.length) return "";
+    const t = diaryTotals(day);
+    const groups = [];
+    day.items.forEach((x) => { const g = x.m || ""; if (!groups.length || groups[groups.length - 1].m !== g) groups.push({ m: g, items: [] }); groups[groups.length - 1].items.push(x); });
+    const row = (x) => `<tr><td>${esc(x.n)}${x.q ? `<small>${esc(x.q)}</small>` : ""}</td><td>${Math.round(x.k)}</td><td>${fmtNum(x.p, 0)}</td><td>${fmtNum(x.c, 0)}</td><td>${fmtNum(x.f, 0)}</td></tr>`;
+    const diff = (v, o) => { const d = Math.round(v - o); return `<span class="${d < 0 ? "neg" : "pos"}">${d > 0 ? "+" : ""}${fmtNum(d, 0)}</span>`; };
+    return `<section class="card diary"><div class="row-between"><div><div class="eyebrow">Calculado por Claude</div><h2>Lo que has comido</h2></div><span class="pill">${day.items.length} alimentos</span></div>
+      <div class="dtable-wrap"><table class="dtable"><thead><tr><th>Alimento</th><th>kcal</th><th>P</th><th>H</th><th>G</th></tr></thead>
+      <tbody>${groups.map((g) => `${g.m ? `<tr class="grp"><td colspan="5">${esc(g.m)}</td></tr>` : ""}${g.items.map(row).join("")}`).join("")}</tbody>
+      <tfoot><tr><td>Total</td><td>${fmtNum(t.k, 0)}</td><td>${fmtNum(t.p, 0)}</td><td>${fmtNum(t.c, 0)}</td><td>${fmtNum(t.f, 0)}</td></tr>
+        <tr class="obj"><td>Objetivo</td><td>${fmtNum(tg.kcal, 0)}</td><td>${tg.p}</td><td>${tg.c}</td><td>${tg.f}</td></tr>
+        <tr class="dif"><td>Diferencia</td><td>${diff(t.k, tg.kcal)}</td><td>${diff(t.p, tg.p)}</td><td>${diff(t.c, tg.c)}</td><td>${diff(t.f, tg.f)}</td></tr></tfoot></table></div>
+      ${day.note ? `<p class="muted tiny">${esc(day.note)}</p>` : ""}
+      <p class="muted tiny">Este día cuenta lo que le has dicho a Claude en lugar de las comidas marcadas abajo.</p></section>`;
+  }
   function consumed(date) {
+    if (DIARIO[date]?.items?.length) return diaryTotals(DIARIO[date]);
     const st = dayState(date);
     const parts = [];
     MEALS.forEach((m) => {
@@ -1293,6 +1327,7 @@
           ${macroBar("Proteína", eat.p, tg.p, "m-p")}${macroBar("Hidratos", eat.c, tg.c, "m-c")}${macroBar("Grasa", eat.f, tg.f, "m-f")}
         </div>
       </section>
+      ${diaryCard(date, tg)}
       <section class="card">
         <div class="row-between"><div><div class="eyebrow">En ayunas</div><h2>Peso</h2></div>
           <div class="weight-in"><input id="wIn" inputmode="decimal" value="${esc(st.weight)}" placeholder="kg" aria-label="Peso del día"><span>kg</span></div></div>
@@ -1778,6 +1813,8 @@
       nutricion: () => viewNutricion(arg), progreso: viewProgreso, guia: viewGuia, datos: viewDatos }[view] || viewHoy)();
   }
   window.addEventListener("hashchange", () => { route(); window.scrollTo(0, 0); });
+  loadDiario();
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") loadDiario(); });
   applyTheme();
   if (new URLSearchParams(location.search).get("state") === "strava") {
     location.hash = "#/datos";

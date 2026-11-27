@@ -1,0 +1,104 @@
+{
+ "2026-11-27": {
+  "items": [
+   {
+    "n": "Tostadas de pan Panrico",
+    "q": "2 rebanadas",
+    "k": 150,
+    "p": 6,
+    "c": 28,
+    "f": 2
+   },
+   {
+    "n": "Crema de cacahuete",
+    "q": "≈15 g",
+    "k": 90,
+    "p": 4,
+    "c": 3,
+    "f": 8
+   },
+   {
+    "n": "Queso crema",
+    "q": "≈20 g",
+    "k": 50,
+    "p": 1,
+    "c": 1,
+    "f": 5
+   },
+   {
+    "n": "Aguacate",
+    "q": "½ pieza",
+    "k": 115,
+    "p": 1.5,
+    "c": 3,
+    "f": 10.5
+   },
+   {
+    "n": "Café doble con leche desnatada",
+    "q": "≈150 ml de leche",
+    "k": 55,
+    "p": 5,
+    "c": 7,
+    "f": 0.3
+   },
+   {
+    "n": "Milanesas",
+    "q": "3 uds (≈120 g c/u)",
+    "k": 800,
+    "p": 75,
+    "c": 30,
+    "f": 42
+   },
+   {
+    "n": "Patatas fritas de bolsa",
+    "q": "50 g",
+    "k": 270,
+    "p": 3,
+    "c": 25,
+    "f": 17
+   },
+   {
+    "n": "Espaguetis boloñesa",
+    "q": "250 g (plato hecho)",
+    "k": 400,
+    "p": 18,
+    "c": 50,
+    "f": 13
+   },
+   {
+    "n": "Avena molida",
+    "q": "75 g",
+    "k": 280,
+    "p": 10,
+    "c": 45,
+    "f": 5
+   },
+   {
+    "n": "Leche desnatada",
+    "q": "300 g",
+    "k": 105,
+    "p": 10,
+    "c": 15,
+    "f": 0.5
+   },
+   {
+    "n": "Plátano",
+    "q": "1 mediano",
+    "k": 105,
+    "p": 1,
+    "c": 25,
+    "f": 0.4
+   },
+   {
+    "n": "Crema de cacahuete",
+    "q": "1 cucharada grande (≈20 g)",
+    "k": 120,
+    "p": 5,
+    "c": 4,
+    "f": 10
+   }
+  ],
+  "note": "Estimación: tamaño de las milanesas supuesto.",
+  "at": "2026-11-27T23:04:11.032Z"
+ }
+}
