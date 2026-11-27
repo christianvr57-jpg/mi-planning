@@ -175,13 +175,27 @@
     return groups.map((g) => `<div class="slot">${g.t ? `<div class="slot-h">${g.t === "Mañana" ? "☀️" : "🌙"} ${g.t}</div>` : ""}<ol class="steps">${g.items.filter(Boolean).map((x) => `<li>${richText(x)}</li>`).join("")}</ol></div>`).join("");
   }
   // Predicción del 10K (Riegel) con el último test registrado
+  // Predicción del 10K (Riegel, exponente 1,06): la mejor marca equivalente de las últimas 6 semanas,
+  // entre tests y los mejores 5 y 10 km que Strava detecta en cualquier carrera
+  function runMarks() {
+    const out = [];
+    ALL.forEach((s) => {
+      const l = Store.getLog(s.id); if (!l) return;
+      const add = (v, dist, src, test) => { const sec = toSec(v); if (!sec || sec < dist * 150 || sec > dist * 480) return;
+        out.push({ s, date: s.date, dist, sec, eq: sec * Math.pow(10 / dist, 1.06), src, test }); };
+      const key = { test5k: "t5k", test10k: "t10k", race10k: "race10k" }[s.metrics];
+      if (key && l.metrics?.[key]) add(l.metrics[key], s.metrics === "test5k" ? 5 : 10, s.metrics === "race10k" ? "el 10K" : `el test de ${s.metrics === "test5k" ? 5 : 10} km`, true);
+      if (l.be10k) add(l.be10k, 10, "tu mejor 10 km en Strava");
+      if (l.be5k) add(l.be5k, 5, "tu mejor 5 km en Strava");
+    });
+    return out;
+  }
   function runPrediction() {
-    const tests = ALL.filter((x) => ["test5k", "test10k", "race10k"].includes(x.metrics)).map((x) => {
-      const key = { test5k: "t5k", test10k: "t10k", race10k: "race10k" }[x.metrics];
-      return { s: x, dist: x.metrics === "test5k" ? 5 : 10, v: Store.getLog(x.id)?.metrics?.[key] };
-    }).filter((t) => t.v && toSec(t.v));
-    const last = tests[tests.length - 1];
-    return { pred: last ? toSec(last.v) * Math.pow(10 / last.dist, 1.06) : toSec("20:00") * Math.pow(2, 1.06), last };
+    const marks = runMarks(), from = addDays(todayISO(), -42);
+    const recent = marks.filter((m) => m.date >= from);
+    const pool = recent.length ? recent : marks.filter((m) => m.test).slice(-1);
+    const best = pool.reduce((a, b) => (!a || b.eq < a.eq ? b : a), null);
+    return { pred: best ? best.eq : toSec("20:00") * Math.pow(2, 1.06), last: best, marks };
   }
 
   function heroSession(s, label) {
@@ -384,7 +398,9 @@
           </div></a>`; })()}
       ${(() => { const nst = dayState(t), ntg = targetsFor(nst.type), ne = consumed(t), np = Math.min(100, Math.round((ne.k / ntg.kcal) * 100));
         return `<a class="card nutmini" href="#/nutricion"><div class="nm-ring">${ring(np, 52, 6)}<span>${np}%</span></div>
-          <div class="nm-body"><div class="eyebrow">Comida · ${DAY_TYPES[nst.type].name}</div><b>${fmtNum(ne.k, 0)} / ${fmtNum(ntg.kcal, 0)} kcal</b><small>Proteína ${Math.round(ne.p)}/${ntg.p} g${nst.weight ? ` · ${esc(nst.weight)} kg` : " · pésate en ayunas"}</small></div>${ico("chev")}</a>`; })()}
+          <div class="nm-body"><div class="eyebrow">Comida · ${DAY_TYPES[nst.type].name}${DIARIO[t]?.items?.length ? " · diario" : ""}</div><b>${fmtNum(ne.k, 0)} / ${fmtNum(ntg.kcal, 0)} kcal${ne.k ? ` <span class="nm-left">${ne.k < ntg.kcal ? `faltan ${fmtNum(ntg.kcal - ne.k, 0)}` : "✓"}</span>` : ""}</b>
+            <div class="nm-macros">${[["P", ne.p, ntg.p, "m-p"], ["H", ne.c, ntg.c, "m-c"], ["G", ne.f, ntg.f, "m-f"]].map(([l, v, g, c]) => `<span class="${c}"><i style="width:${Math.min(100, (v / g) * 100)}%"></i><em>${l} ${Math.round(v)}/${g}</em></span>`).join("")}</div>
+            <small>${ne.k ? "" : "Cuéntale a tu chat del diario lo que comas · "}${nst.weight ? `${esc(nst.weight)} kg` : "pésate en ayunas"}</small></div>${ico("chev")}</a>`; })()}
       <section class="card">
         <div class="row-between"><div><div class="eyebrow">Semana ${w.week}</div><h2>${esc(w.title)}</h2></div><a class="link" href="#/plan/${w.week}">Ver semana ${ico("chev")}</a></div>
         <div class="weekstrip">${w.sessions.map((x) => `<a href="#/sesion/${x.id}" class="int-${x.intensity} ${x.id === s.id ? "on" : ""} st-${statusKey(x)}">
@@ -658,8 +674,10 @@
     Figs.start();
   }
   function openExercise(name) {
-    const g = GYM_MEDIA[name]; if (!g) return;
-    openSheetHtml(name, `${mediaHtml({ img: g[0] }, "big")}<p class="muscles">Trabaja: <b>${esc(g[1])}</b></p><p class="muted tiny">Imágenes: free-exercise-db (dominio público).</p>`);
+    const g = GYM_MEDIA[name];
+    openSheetHtml(name, `${g ? `${mediaHtml({ img: g[0] }, "big")}<p class="muscles">Trabaja: <b>${esc(g[1])}</b></p>` : ""}
+      <h3 class="mt">Tu progreso</h3>${exProgressHtml(name)}${g ? `<p class="muted tiny">Imágenes: free-exercise-db (dominio público).</p>` : ""}`);
+    bindTips();
   }
   function openMove(id, dose) {
     const m = MOVES[id];
@@ -796,7 +814,9 @@
         ${metrics.length ? `<div class="metricbox"><h3>Resultados</h3><div class="grid2">${metrics.map((m) =>
           `<div><label for="m_${m.key}">${esc(m.label)} <small>(${m.unit})</small></label><input id="m_${m.key}" data-metric="${m.key}" value="${esc(log.metrics?.[m.key] || "")}" placeholder="${esc(m.hint)}"></div>`).join("")}</div></div>` : ""}
         ${hasRun ? `<label for="splits">Parciales de carrera (opcional)</label>
-        <textarea id="splits" name="splits" rows="2" placeholder="p. ej. 3:50, 3:49, 3:51, 3:48, 3:47">${esc(log.splits || "")}</textarea>` : ""}
+        <textarea id="splits" name="splits" rows="2" placeholder="p. ej. 3:50, 3:49, 3:51, 3:48, 3:47">${esc(log.splits || "")}</textarea>
+        <input type="hidden" name="be5k" value="${esc(log.be5k || "")}"><input type="hidden" name="be10k" value="${esc(log.be10k || "")}">
+        ${log.be5k || log.be10k ? `<p class="muted tiny">Mejores marcas en esta carrera (Strava): ${[log.be5k && `5 km ${esc(log.be5k)}`, log.be10k && `10 km ${esc(log.be10k)}`].filter(Boolean).join(" · ")}</p>` : ""}` : ""}
         <label for="notes">Notas</label>
         <textarea id="notes" name="notes" rows="3" placeholder="Sensaciones, molestias, cambios…">${esc(log.notes || "")}</textarea>
         <div class="actions">
@@ -835,6 +855,7 @@
         setv("hr", r.hr ?? "");
         setv("hrmax", r.hrmax ?? "");
         setv("splits", r.splits);
+        setv("be5k", r.best5k); setv("be10k", r.best10k);
         if (["run", "test", "race"].includes(s.kind)) setv("minutes", r.minutes);
         const mk = { test5k: ["t5k", r.best5k, "t5k_hr"], test10k: ["t10k", r.best10k, "t10k_hr"], race10k: ["race10k", r.best10k, "race_hr"] }[s.metrics];
         if (mk) { const t = form.querySelector(`[data-metric="${mk[0]}"]`), h = form.querySelector(`[data-metric="${mk[2]}"]`);
@@ -864,7 +885,7 @@
       if (!status) { toast("Elige el estado de la sesión"); return; }
       const data = { week: s.week, date: s.date, title: s.title, status, fatigue: segv("fatigue"),
         rpe: rpe.dataset.touched === "1" ? Number(rpe.value) : "", metrics: {}, loads: {} };
-      ["minutes", "km", "hr", "hrmax", "pace", "weight", "splits", "notes"].forEach((k) => (data[k] = form.elements[k] ? form.elements[k].value.trim() : log[k] || ""));
+      ["minutes", "km", "hr", "hrmax", "pace", "weight", "splits", "be5k", "be10k", "notes"].forEach((k) => (data[k] = form.elements[k] ? form.elements[k].value.trim() : log[k] || ""));
       form.querySelectorAll("[data-metric]").forEach((i) => { if (i.value.trim()) data.metrics[i.dataset.metric] = i.value.trim(); });
       data.sets = {};
       form.querySelectorAll(".exlog").forEach((ex) => {
@@ -960,6 +981,93 @@
       </tbody></table></div></section>`;
   }
 
+  // ——— Gráfica de evolución en el tiempo (fechas en X) ———
+  // pts: [{ date, v, tip }] · refs: líneas de referencia [{ v, label }] · invert: valores menores arriba (tiempos)
+  function trendChart(pts, { fmtY = (v) => fmtNum(v, 0), refs = [], invert = false, H = 170, label = "Evolución" } = {}) {
+    if (!pts.length) return "";
+    const W = 420, pl = 44, pr = 12, pt = 14, pb = 24;
+    const vals = [...pts.map((p) => p.v), ...refs.map((r) => r.v)];
+    let lo = Math.min(...vals), hi = Math.max(...vals);
+    const pad = (hi - lo || Math.abs(hi) * 0.05 || 1) * 0.15; lo -= pad; hi += pad;
+    const t0 = Date.parse(pts[0].date), t1 = Date.parse(pts[pts.length - 1].date), span = t1 - t0;
+    const x = (d) => (span ? pl + (W - pl - pr) * ((Date.parse(d) - t0) / span) : (pl + W - pr) / 2);
+    const y = (v) => { const f = (v - lo) / (hi - lo); return pt + (H - pt - pb) * (invert ? f : 1 - f); };
+    const ticks = [lo + (hi - lo) * 0.15, (lo + hi) / 2, hi - (hi - lo) * 0.15];
+    const path = pts.map((p, i) => `${i ? "L" : "M"}${x(p.date).toFixed(1)},${y(p.v).toFixed(1)}`).join(" ");
+    const xl = span ? [pts[0], pts[pts.length - 1]] : [pts[0]];
+    return `<div class="chart"><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(label)}">
+      ${ticks.map((v) => `<line class="grid" x1="${pl}" x2="${W - pr}" y1="${y(v)}" y2="${y(v)}"/><text class="axis" x="${pl - 6}" y="${y(v) + 4}" text-anchor="end">${fmtY(v)}</text>`).join("")}
+      ${refs.map((r) => `<line class="l-ref" x1="${pl}" x2="${W - pr}" y1="${y(r.v)}" y2="${y(r.v)}"/><text class="axis ref" x="${W - pr}" y="${y(r.v) - 4}" text-anchor="end">${esc(r.label)}</text>`).join("")}
+      ${xl.map((p, i) => `<text class="axis" x="${x(p.date)}" y="${H - 6}" text-anchor="${span ? (i ? "end" : "start") : "middle"}">${fmtDate(p.date)}</text>`).join("")}
+      ${pts.length > 1 ? `<path class="l-real" d="${path}"/>` : ""}
+      ${pts.map((p) => `<circle class="pt" cx="${x(p.date)}" cy="${y(p.v)}" r="4"/>`).join("")}
+      ${pts.map((p) => `<g class="hit" data-tip="${esc(p.tip)}"><circle cx="${x(p.date)}" cy="${y(p.v)}" r="12" fill="transparent"/></g>`).join("")}
+    </svg></div>`;
+  }
+
+  // ——— Progreso por ejercicio ———
+  function exHistory(ex) {
+    return ALL.map((s) => ({ s, sets: Store.getLog(s.id)?.sets?.[ex] })).filter((h) => h.sets?.length)
+      .map(({ s, sets }) => ({ s, date: s.date, sets, text: setsSummary(sets), ...setsStats(sets) }));
+  }
+  function exProgressHtml(ex) {
+    const h = exHistory(ex);
+    if (!h.length) return `<p class="muted tiny">Aún no has registrado series de este ejercicio. Cuando lo hagas, aquí verás cómo evolucionan tus kilos y tu 1RM estimado.</p>`;
+    const bw = isBodyweight(ex) && h.every((x) => !x.top);
+    const pr = h.reduce((a, b) => (b.best > a.best ? b : a), h[0]);
+    const prSet = pr.sets.reduce((a, b) => (e1rm(b.kg, b.reps) > e1rm(a.kg, a.reps) ? b : a));
+    const first = h[0], last = h[h.length - 1];
+    const d = (a, b) => { const v = a - b; return `<small class="${v >= 0 ? "pos" : "neg"}">${v >= 0 ? "▲" : "▼"} ${fmtNum(Math.abs(v), 1)}</small>`; };
+    const series = bw ? h.map((x) => ({ date: x.date, v: x.reps, tip: `${fmtDate(x.date)} · ${x.text}` }))
+      : h.map((x) => ({ date: x.date, v: Math.round(x.best * 10) / 10, tip: `${fmtDate(x.date)} · ${x.text} · 1RM ≈ ${fmtNum(x.best, 0)} kg` }));
+    return `<div class="kpis three exkpis">
+        <div><span>${bw ? "Reps totales" : "Última carga"}</span><b>${bw ? last.reps : `${kgStr(last.top)}<small> kg</small>`}</b>${h.length > 1 ? d(bw ? last.reps : last.top, bw ? first.reps : first.top) : ""}</div>
+        <div><span>1RM estimado</span><b>${last.best ? fmtNum(last.best, 0) : "—"}<small>${last.best ? " kg" : ""}</small></b>${h.length > 1 && last.best ? d(last.best, first.best) : ""}</div>
+        <div><span>Mejor marca</span><b>${pr.best ? `${kgStr(prSet.kg)}×${prSet.reps}` : "—"}</b><small>${fmtDate(pr.date)}</small></div>
+      </div>
+      <h3 class="mt">${bw ? "Repeticiones por sesión" : "1RM estimado por sesión"}</h3>
+      ${trendChart(series, { fmtY: (v) => fmtNum(v, 0), label: `Evolución de ${ex}` })}
+      <table class="tbl"><thead><tr><th>Fecha</th><th>Series</th><th>Vol.</th><th>1RM</th></tr></thead><tbody>
+      ${h.slice().reverse().slice(0, 8).map((x) => `<tr><td><a href="#/sesion/${x.s.id}">${fmtDate(x.date)}</a></td><td>${esc(x.text)}</td><td>${x.vol ? fmtNum(x.vol, 0) : "—"}</td><td>${x.best ? fmtNum(x.best, 0) : "—"}</td></tr>`).join("")}
+      </tbody></table>`;
+  }
+  function strengthProgressSection() {
+    const exs = [...new Set(STRENGTH_ORDER.flatMap((k) => STRENGTH[k].rows.map((r) => r.ex)))].map((ex) => ({ ex, h: exHistory(ex) })).filter((x) => x.h.length);
+    if (!exs.length) return `<section class="card"><h2>Fuerza por ejercicio</h2><p class="muted">Cuando registres series, aquí verás la evolución de cada ejercicio. Toca uno para ver su gráfica.</p></section>`;
+    return `<section class="card"><h2>Fuerza por ejercicio</h2><p class="muted">1RM estimado (Epley) de la última sesión y cambio desde la primera. Toca un ejercicio para ver su gráfica.</p>
+      <div class="exprog">${exs.map(({ ex, h }) => { const a = h[0], b = h[h.length - 1], dv = b.best - a.best;
+        return `<button type="button" class="exrow" data-exmedia="${esc(ex)}"><span class="ex-name">${esc(ex)}<small>${h.length} sesión${h.length > 1 ? "es" : ""} · última ${esc(b.text)}</small></span>
+          <span class="exrow-v"><b>${b.best ? fmtNum(b.best, 0) : "—"}</b>${h.length > 1 && b.best ? `<small class="${dv >= 0 ? "pos" : "neg"}">${dv >= 0 ? "▲" : "▼"} ${fmtNum(Math.abs(dv), 1)}</small>` : ""}</span>${ico("chev", "chev")}</button>`; }).join("")}</div></section>`;
+  }
+
+  // ——— Eficiencia aeróbica: ritmo en Z2 frente al pulso ———
+  function z2Runs() {
+    return ALL.map((s) => ({ s, l: Store.getLog(s.id) }))
+      .filter(({ s, l }) => l && ["run", "hybrid"].includes(s.kind) && s.intensity === "suave" && num(l.hr) > 90 && toSec(l.pace) > 150 && toSec(l.pace) < 600)
+      .map(({ s, l }) => { const pace = toSec(l.pace), hr = num(l.hr); return { s, date: s.date, pace, hr, eff: 60000 / pace / hr }; });
+  }
+  function efficiencySection() {
+    const r = z2Runs();
+    if (r.length < 2) return `<section class="card"><h2>Eficiencia aeróbica</h2><p class="muted">Compara tu ritmo en los rodajes suaves con tu pulso: si a igual pulso vas más rápido, tu motor aeróbico mejora. Necesito al menos 2 rodajes en Z2 con ritmo y FC (se rellenan solos desde Strava).</p></section>`;
+    const hrs = r.map((x) => x.hr).sort((a, b) => a - b), ref = Math.round(hrs[Math.floor(hrs.length / 2)]);
+    const at = (eff) => 60000 / (eff * ref); // seg/km a la FC de referencia
+    const n = Math.min(3, Math.floor(r.length / 2)) || 1;
+    const avg = (xs) => xs.reduce((a, x) => a + x.eff, 0) / xs.length;
+    const e0 = avg(r.slice(0, n)), e1 = avg(r.slice(-n));
+    const gain = at(e0) - at(e1), pct = (e1 / e0 - 1) * 100;
+    return `<section class="card"><h2>Eficiencia aeróbica</h2>
+      <p class="muted">Tu ritmo en los rodajes suaves llevado a una misma FC (${ref} ppm, tu pulso típico en Z2). Si la línea sube, a igual pulso vas más rápido.</p>
+      <div class="kpis three">
+        <div><span>Al principio</span><b>${fmtSec(at(e0))}<small>/km</small></b></div>
+        <div><span>Ahora</span><b>${fmtSec(at(e1))}<small>/km</small></b></div>
+        <div><span>Mejora</span><b class="${gain >= 0 ? "pos" : "neg"}">${gain >= 0 ? "−" : "+"}${Math.round(Math.abs(gain))}"<small>/km</small></b></div>
+      </div>
+      ${trendChart(r.map((x) => ({ date: x.date, v: Math.round(at(x.eff)), tip: `${fmtDate(x.date)} · ${fmtSec(x.pace)}/km a ${x.hr} ppm → ${fmtSec(at(x.eff))}/km a ${ref}` })),
+        { fmtY: (v) => fmtSec(v), invert: true, label: "Ritmo a FC de referencia" })}
+      <p class="muted tiny">${r.length} rodajes · ${pct >= 0 ? "+" : ""}${fmtNum(pct, 1)} % de metros por latido (medias de los ${n} primeros y los ${n} últimos). El calor, el desnivel o el cansancio también suben el pulso: mira la tendencia, no un día suelto.</p>
+    </section>`;
+  }
+
   // ——— Progreso ———
   function viewProgreso() {
     const t = todayISO();
@@ -987,6 +1095,8 @@
       <section class="card"><h2>Carga semanal</h2><p class="muted">Sesiones hechas, km de carrera, series de fuerza, horas, RPE medio y semáforo.</p>${loadTable()}</section>
       <section class="card"><h2>Peso corporal</h2><p class="muted">Fase de volumen: objetivo +0,4 a +0,7 kg por semana (media de 7 días).</p>${weightChart()}</section>
       ${runSection()}
+      ${efficiencySection()}
+      ${strengthProgressSection()}
     `;
     bindTips();
   }
@@ -1049,9 +1159,11 @@
       ...WEEKS.flatMap((w) => w.sessions.filter((x) => x.metrics === "test10k").map((x) => ({ s: x, key: "t10k", label: `Test 10 km (S${w.week})`, dist: 10 }))),
       ...WEEKS.flatMap((w) => w.sessions.filter((x) => x.metrics === "race10k").map((x) => ({ s: x, key: "race10k", label: "<b>10K</b>", dist: 10 }))),
     ].map((t) => ({ ...t, v: Store.getLog(t.s.id)?.metrics?.[t.key] || null }));
-    const done = tests.filter((t) => t.v && toSec(t.v));
-    const last = done[done.length - 1];
-    const pred = runPrediction().pred; // Riegel (exponente 1,06) desde el último test
+    const rp = runPrediction(), pred = rp.pred, last = rp.last;
+    // Mejor 10K equivalente de cada semana, para ver la tendencia
+    const byWeek = {};
+    rp.marks.forEach((m) => { const k = m.s.week; if (!byWeek[k] || m.eq < byWeek[k].eq) byWeek[k] = m; });
+    const wk = Object.values(byWeek).sort((a, b) => (a.date < b.date ? -1 : 1));
     const goal = toSec(ATHLETE.targets[tg].total);
     const gap = pred - goal;
     return `<section class="card"><div class="row-between"><h2>Carrera 10K</h2>
@@ -1061,7 +1173,9 @@
         <div><span>Objetivo ${tg}</span><b>${ATHLETE.targets[tg].total}</b></div>
         <div><span>Diferencia</span><b class="${gap <= 0 ? "pos" : "neg"}">${gap <= 0 ? "−" : "+"}${fmtSec(Math.abs(gap))}</b></div>
       </div>
-      <p class="muted tiny">Predicción con la fórmula de Riegel a partir de ${last ? `tu ${last.label.replace(/<[^>]+>/g, "")}` : "tu 5 km de partida (20:00)"}. Ritmo objetivo: ${ATHLETE.targets[tg].pace}.</p>
+      <p class="muted tiny">Predicción con la fórmula de Riegel a partir de ${last ? `${last.src} (${fmtSec(last.sec)}, ${fmtDate(last.date)})` : "tu 5 km de partida (20:00)"}: la mejor marca equivalente de las últimas 6 semanas. Ritmo objetivo: ${ATHLETE.targets[tg].pace}.</p>
+      ${wk.length ? `<h3 class="mt">Tu 10K estimado, semana a semana</h3>${trendChart(wk.map((m) => ({ date: m.date, v: Math.round(m.eq), tip: `S${m.s.week} · ${fmtSec(m.eq)} (${m.src}: ${fmtSec(m.sec)})` })),
+        { fmtY: (v) => fmtSec(v), invert: true, refs: ["A", "B"].map((k) => ({ v: toSec(ATHLETE.targets[k].total), label: `${k} ${ATHLETE.targets[k].total}` })), label: "10K estimado por semana" })}` : ""}
       <div class="scroll-x"><table class="tbl"><thead><tr><th>Test</th><th>Tiempo</th><th>Ritmo</th><th>10K equiv.</th></tr></thead><tbody>
         <tr><td class="muted">Punto de partida</td><td>20:00</td><td>4:00/km</td><td>${fmtSec(toSec("20:00") * Math.pow(2, 1.06))}</td></tr>
         ${tests.map((t) => { const sec = t.v ? toSec(t.v) : null;
@@ -1234,7 +1348,7 @@
       if (txt === localStorage.getItem(DIARIO_KEY)) return;
       DIARIO = JSON.parse(txt);
       try { localStorage.setItem(DIARIO_KEY, txt); } catch {}
-      if (["nutricion", "progreso"].includes(app.dataset.view)) { const y = window.scrollY; route(); window.scrollTo(0, y); }
+      if (["hoy", "nutricion", "progreso"].includes(app.dataset.view)) { const y = window.scrollY; route(); window.scrollTo(0, y); }
     } catch {}
   }
   const diaryTotals = (day) => day.items.reduce((a, x) => ({ k: a.k + x.k, p: a.p + x.p, c: a.c + x.c, f: a.f + x.f }), { k: 0, p: 0, c: 0, f: 0 });
