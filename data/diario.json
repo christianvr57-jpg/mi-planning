@@ -147,9 +147,25 @@
     "p": 6.5,
     "c": 9.5,
     "f": 3.2
+   },
+   {
+    "n": "Dátiles sin hueso",
+    "q": "5 (≈40 g)",
+    "k": 113,
+    "p": 1,
+    "c": 27,
+    "f": 0.2
+   },
+   {
+    "n": "Pasas sultanas",
+    "q": "≈1 puñado (30 g)",
+    "k": 90,
+    "p": 0.9,
+    "c": 22,
+    "f": 0.1
    }
   ],
   "note": "Supuesto: leche semidesnatada sin azúcar y ½ aguacate, estimado por la foto.",
-  "at": "2026-11-28T08:53:52.340Z"
+  "at": "2026-11-28T12:07:41.373Z"
  }
 }
