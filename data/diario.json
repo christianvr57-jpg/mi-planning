@@ -100,5 +100,56 @@
   ],
   "note": "Estimación: tamaño de las milanesas supuesto.",
   "at": "2026-11-27T23:04:11.032Z"
+ },
+ "2026-11-28": {
+  "items": [
+   {
+    "m": "Desayuno",
+    "n": "Pan tostado",
+    "q": "≈2 rebanadas (70 g)",
+    "k": 180,
+    "p": 6,
+    "c": 34,
+    "f": 2
+   },
+   {
+    "m": "Desayuno",
+    "n": "Queso crema Milbona Original",
+    "q": "≈30 g",
+    "k": 74,
+    "p": 1.5,
+    "c": 1,
+    "f": 7
+   },
+   {
+    "m": "Desayuno",
+    "n": "Aguacate",
+    "q": "≈½ (75 g)",
+    "k": 120,
+    "p": 1.5,
+    "c": 6.5,
+    "f": 11
+   },
+   {
+    "m": "Desayuno",
+    "n": "Jamón cocido",
+    "q": "≈2 lonchas (40 g)",
+    "k": 45,
+    "p": 8,
+    "c": 0.5,
+    "f": 1.2
+   },
+   {
+    "m": "Desayuno",
+    "n": "Café con leche semidesnatada, sin azúcar",
+    "q": "≈200 ml leche",
+    "k": 95,
+    "p": 6.5,
+    "c": 9.5,
+    "f": 3.2
+   }
+  ],
+  "note": "Supuesto: leche semidesnatada sin azúcar y ½ aguacate, estimado por la foto.",
+  "at": "2026-11-28T08:53:52.340Z"
  }
 }
